@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "postinstall": "node verify-vite-version.js",
     "build": "node verify-vite-version.js && vite build",
     "build:check": "tsc && vite build",
     "build:verify": "npm run build && node verify-css-build.js",
