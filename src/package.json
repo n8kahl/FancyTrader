@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "prebuild": "echo '========================================' && echo '🔍 DIAGNOSTIC INFO' && echo '========================================' && echo '📦 Package name:' && grep '\"name\"' package.json && echo '' && echo '📋 Vite in package.json:' && grep '\"vite\"' package.json && echo '' && echo '📂 Node modules vite:' && ls -la node_modules/.bin/vite 2>/dev/null || echo 'vite binary not found' && echo '' && echo '🔧 NPM list vite:' && npm list vite --depth=0 && echo '' && echo '🌍 Global which vite:' && which vite || echo 'vite not in PATH' && echo '' && echo '📄 Vite config exists:' && ls -la vite.config.ts && echo '========================================' && echo '🚀 STARTING BUILD...' && echo '========================================'",
+    "build": "vite build && echo '' && echo '========================================' && echo '✅ BUILD COMPLETE!' && echo '========================================' && echo '📊 Generated files:' && ls -lh build/assets/ && echo '' && echo '📏 CSS file sizes:' && find build/assets -name '*.css' -exec ls -lh {} \\; && echo '' && echo '🎯 JS file sizes:' && find build/assets -name '*.js' -exec ls -lh {} \\; && echo '========================================'",
     "build:check": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
