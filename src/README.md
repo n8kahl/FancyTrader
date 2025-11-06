@@ -2,7 +2,9 @@
 
 Real-time KCU LTP Setup Monitor and Discord Alerts System with full backend integration.
 
-**Status:** ✅ Ready to deploy (see `DEPLOY.md`)
+**Status:** ✅ Ready to deploy
+
+**Recommended Platform:** Netlify (see `NETLIFY-QUICKSTART.txt` or `DEPLOY-TO-NETLIFY.md`)
 
 ## Features
 

@@ -1,0 +1,82 @@
+╔═══════════════════════════════════════════════════════════════╗
+║     🚨 BACKEND NOT CONNECTING - 3 STEP FIX 🚨                 ║
+╚═══════════════════════════════════════════════════════════════╝
+
+THE PROBLEM:
+  Frontend shows mock data instead of real data
+  Backend at fancy-trader.up.railway.app not connecting
+
+═══════════════════════════════════════════════════════════════
+
+STEP 1: TEST IT (NEW FEATURE!)
+  
+  I just added a "Test" button to your frontend!
+  
+  1. Open your frontend (Netlify/Vercel)
+  2. Click "Test" button (top-right, next to "Go Live")
+  3. Click "Run Connection Tests"
+  4. See which test fails!
+
+═══════════════════════════════════════════════════════════════
+
+STEP 2: MOST LIKELY FIX - ADD CORS
+
+  Go to your backend code:
+  backend/src/index.ts
+  
+  Add this near the top:
+  
+  import cors from 'cors';
+  app.use(cors());
+  
+  That's it!
+
+═══════════════════════════════════════════════════════════════
+
+STEP 3: REDEPLOY & TEST
+
+  1. Commit and push backend changes
+  2. Wait for Railway to redeploy (1-2 min)
+  3. Go back to frontend
+  4. Click "Test" button again
+  5. All tests should pass! ✅
+  6. Click "Go Live" button
+  7. See real data! 🎉
+
+═══════════════════════════════════════════════════════════════
+
+ALTERNATIVE: QUICK BROWSER TEST
+
+  Open this URL:
+  https://fancy-trader.up.railway.app/health
+  
+  Should see JSON like:
+  {"status":"ok","timestamp":"...","uptime":12345}
+  
+  If you see an error:
+    → Backend is not running on Railway
+    → Check Railway dashboard for errors
+
+═══════════════════════════════════════════════════════════════
+
+CHECKLIST:
+
+  [ ] Backend deployed on Railway
+  [ ] /health endpoint responds
+  [ ] CORS enabled (app.use(cors()))
+  [ ] Frontend "Test" button passes
+  [ ] "Go Live" shows "Connected"
+
+═══════════════════════════════════════════════════════════════
+
+99% OF THE TIME IT'S CORS!
+
+Just add:
+  import cors from 'cors';
+  app.use(cors());
+
+Redeploy and you're done! 🚀
+
+═══════════════════════════════════════════════════════════════
+
+USE THE TEST BUTTON - IT WILL TELL YOU EXACTLY WHAT'S WRONG! 🔍

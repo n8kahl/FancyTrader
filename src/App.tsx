@@ -11,6 +11,7 @@ import { TradeProgressManager } from "./components/TradeProgressManager";
 import { ActiveTradesPanel } from "./components/ActiveTradesPanel";
 import { BackendSetupGuide } from "./components/BackendSetupGuide";
 import { DiagnosticPanel } from "./components/DiagnosticPanel";
+import { BackendConnectionTest } from "./components/BackendConnectionTest";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
@@ -67,6 +68,7 @@ export default function App() {
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [showStrategySettings, setShowStrategySettings] = useState(false);
   const [showWatchlistManager, setShowWatchlistManager] = useState(false);
+  const [showBackendTest, setShowBackendTest] = useState(false);
   const [useMockData, setUseMockData] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem("kcu-theme");
@@ -481,6 +483,15 @@ export default function App() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowBackendTest(true)}
+                title="Test Backend Connection"
+              >
+                <Activity className="w-4 h-4 mr-2" />
+                Test
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setShowWatchlistManager(true)}
               >
                 <ListPlus className="w-4 h-4 mr-2" />
@@ -669,6 +680,18 @@ export default function App() {
         watchlist={watchlist}
         onWatchlistChange={setWatchlist}
       />
+
+      {/* Backend Connection Test Modal */}
+      {showBackendTest && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full max-h-[90vh] overflow-auto">
+            <BackendConnectionTest />
+            <div className="mt-4 flex justify-end">
+              <Button onClick={() => setShowBackendTest(false)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {contractSelectorTrade && (
         <OptionsContractSelector
