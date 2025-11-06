@@ -14,6 +14,8 @@ interface BackendConnectionState {
 }
 
 export function useBackendConnection(autoConnect: boolean = true) {
+  logger.info('🔌 useBackendConnection initialized', { autoConnect });
+  
   const [state, setState] = useState<BackendConnectionState>({
     isConnected: false,
     isLoading: true,

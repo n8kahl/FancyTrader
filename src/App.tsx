@@ -10,6 +10,7 @@ import { OptionsContractSelector } from "./components/OptionsContractSelector";
 import { TradeProgressManager } from "./components/TradeProgressManager";
 import { ActiveTradesPanel } from "./components/ActiveTradesPanel";
 import { BackendSetupGuide } from "./components/BackendSetupGuide";
+import { DiagnosticPanel } from "./components/DiagnosticPanel";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
@@ -35,6 +36,8 @@ import { type OptionsContract, type AlertType, type TradeAlert, type PositionTra
 import { generateMockTrades } from "./utils/mockTradeGenerator";
 import { useBackendConnection } from "./hooks/useBackendConnection";
 import { displayWelcomeMessage } from "./utils/welcomeMessage";
+import { logger } from "./utils/logger";
+import { getMode, isDev, getBackendUrl, getBackendWsUrl } from "./utils/env";
 
 // Mock trade data with new confluence system (fallback)
 const mockTrades: Trade[] = generateMockTrades();
@@ -42,9 +45,19 @@ const mockTrades: Trade[] = generateMockTrades();
 // Display welcome message on app load
 if (typeof window !== 'undefined') {
   displayWelcomeMessage();
+  
+  // Log startup info
+  logger.info('🚀 Fancy Trader starting up...', {
+    environment: getMode(),
+    isDev: isDev(),
+    backendUrl: getBackendUrl(),
+    backendWsUrl: getBackendWsUrl(),
+    userAgent: navigator.userAgent,
+  });
 }
 
 export default function App() {
+  logger.info('📱 App component mounting...');
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
   const [alertTrade, setAlertTrade] = useState<Trade | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -679,6 +692,12 @@ export default function App() {
           onDismissTrade={handleDismissTrade}
         />
       )}
+
+      {/* Diagnostic Panel - Shows CSS loading status and debug info */}
+      <DiagnosticPanel />
+      
+      {/* Toast Notifications */}
+      <Toaster />
     </div>
   );
 }

@@ -43,6 +43,7 @@
           "embla-carousel-react": "^8.6.0",
           "events": "*",
           "express": "*",
+          "fs": "*",
           "helmet": "*",
           "hono": "*",
           "http": "*",
@@ -58,6 +59,7 @@
           "recharts": "^2.15.2",
           "sonner": "^2.0.3",
           "tailwind-merge": "*",
+          "url": "*",
           "vaul": "^1.1.2",
           "vite": "*",
           "ws": "*"

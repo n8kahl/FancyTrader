@@ -2,33 +2,44 @@
  * Frontend logger utility
  */
 
+import { isDev } from './env';
+
 type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 
 class Logger {
-  private isDevelopment = import.meta.env?.DEV ?? true;
+  private isDevelopment = isDev();
+  private forceLogging = true; // Force all logs in production for debugging
 
   private log(level: LogLevel, message: string, ...args: any[]) {
     const timestamp = new Date().toISOString();
     const prefix = `[${timestamp}] [${level.toUpperCase()}]`;
+    
+    // Use emoji for better visibility
+    const emoji = {
+      info: 'ℹ️',
+      warn: '⚠️',
+      error: '❌',
+      debug: '🔍'
+    }[level];
 
     // Always log errors
     if (level === 'error') {
-      console.error(prefix, message, ...args);
+      console.error(`${emoji} ${prefix}`, message, ...args);
       return;
     }
 
     // Log warnings in all environments
     if (level === 'warn') {
-      console.warn(prefix, message, ...args);
+      console.warn(`${emoji} ${prefix}`, message, ...args);
       return;
     }
 
-    // Only log debug and info in development
-    if (this.isDevelopment) {
+    // Force logging in production if enabled OR in development
+    if (this.forceLogging || this.isDevelopment) {
       if (level === 'debug') {
-        console.debug(prefix, message, ...args);
+        console.debug(`${emoji} ${prefix}`, message, ...args);
       } else {
-        console.log(prefix, message, ...args);
+        console.log(`${emoji} ${prefix}`, message, ...args);
       }
     }
   }

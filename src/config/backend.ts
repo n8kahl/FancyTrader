@@ -3,16 +3,18 @@
  * Update these URLs based on your deployment
  */
 
+import { isDev, getBackendUrl, getBackendWsUrl } from '../utils/env';
+
 // For local development
 const LOCAL_HTTP_URL = 'http://localhost:8080';
 const LOCAL_WS_URL = 'ws://localhost:8080/ws';
 
 // For Railway production
-const PRODUCTION_HTTP_URL = (import.meta.env?.VITE_BACKEND_URL as string) || 'https://fancy-trader.up.railway.app';
-const PRODUCTION_WS_URL = (import.meta.env?.VITE_BACKEND_WS_URL as string) || 'wss://fancy-trader.up.railway.app/ws';
+const PRODUCTION_HTTP_URL = getBackendUrl();
+const PRODUCTION_WS_URL = getBackendWsUrl();
 
 // Auto-detect environment
-const isDevelopment = import.meta.env?.DEV ?? true;
+const isDevelopment = isDev();
 
 export const BACKEND_CONFIG = {
   httpUrl: isDevelopment ? LOCAL_HTTP_URL : PRODUCTION_HTTP_URL,

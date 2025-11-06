@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:check": "tsc && vite build",
+    "build:verify": "npm run build && node verify-css-build.js",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
@@ -51,7 +52,8 @@
     "react-day-picker": "^8.10.0",
     "react-resizable-panels": "^2.0.11",
     "vaul": "^0.9.0",
-    "input-otp": "^1.2.4"
+    "input-otp": "^1.2.4",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
