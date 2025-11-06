@@ -25,52 +25,79 @@ app.use(helmet());
 app.use(compression());
 
 const defaultAllowedOrigins = [
-  'http://localhost:5173',
   'https://fancy-trader.vercel.app',
+  'http://localhost:5173',
 ];
 
-const allowedOrigins = (process.env.FRONTEND_ORIGINS || '')
+const envAllowedOrigins = (process.env.FRONTEND_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
 
-if (allowedOrigins.length === 0) {
-  allowedOrigins.push(...defaultAllowedOrigins);
-}
+const allowedOrigins = Array.from(new Set([
+  ...envAllowedOrigins,
+  ...defaultAllowedOrigins,
+]));
 
 const corsAllowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
 const corsAllowedHeaders = ['Content-Type', 'Authorization', 'X-Requested-With'];
+const corsExposedHeaders = [
+  'Access-Control-Allow-Origin',
+  'Access-Control-Allow-Methods',
+  'Access-Control-Allow-Headers',
+];
 
 const previewRegex = /^https:\/\/fancy-trader(-[a-z0-9-]+)?\.vercel\.app$/;
 
-const resolveAllowedOrigin = (origin?: string) => {
+const resolveAllowedOrigin = (origin?: string | null) => {
   if (origin && (allowedOrigins.includes(origin) || previewRegex.test(origin))) {
     return origin;
   }
   return allowedOrigins[0];
 };
 
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || previewRegex.test(origin)) {
-      callback(null, resolveAllowedOrigin(origin || undefined));
-    } else {
-      callback(new Error(`CORS not allowed for this origin: ${origin}`));
-    }
-  },
-  credentials: true,
-  methods: corsAllowedMethods,
-  allowedHeaders: corsAllowedHeaders,
-  optionsSuccessStatus: 204,
-}));
-
-app.options('*', (req, res) => {
-  const allowedOrigin = resolveAllowedOrigin(req.headers.origin as string | undefined);
+const attachCorsHeaders = (res: express.Response, origin?: string | null) => {
+  const allowedOrigin = resolveAllowedOrigin(origin);
   res.header('Access-Control-Allow-Origin', allowedOrigin);
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Allow-Methods', corsAllowedMethods.join(', '));
   res.header('Access-Control-Allow-Headers', corsAllowedHeaders.join(', '));
+  res.header('Access-Control-Expose-Headers', corsExposedHeaders.join(', '));
+  res.header('Vary', 'Origin');
+};
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin) {
+      callback(null, resolveAllowedOrigin(null));
+      return;
+    }
+
+    if (allowedOrigins.includes(origin) || previewRegex.test(origin)) {
+      callback(null, origin);
+      return;
+    }
+
+    callback(new Error(`CORS not allowed for this origin: ${origin}`));
+  },
+  credentials: true,
+  methods: corsAllowedMethods,
+  allowedHeaders: corsAllowedHeaders,
+  exposedHeaders: corsExposedHeaders,
+  optionsSuccessStatus: 204,
+}));
+
+app.options('*', (req, res) => {
+  attachCorsHeaders(res, req.headers.origin as string | undefined);
   res.sendStatus(204);
+});
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin as string | undefined;
+  if (!origin || allowedOrigins.includes(origin) || previewRegex.test(origin)) {
+    attachCorsHeaders(res, origin);
+  }
+  next();
 });
 
 app.use(express.json());
