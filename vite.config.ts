@@ -13,6 +13,9 @@
         '@': path.resolve(__dirname, './src'),
       },
     },
+    css: {
+      postcss: './postcss.config.cjs',
+    },
     build: {
       target: 'esnext',
       outDir: 'build',

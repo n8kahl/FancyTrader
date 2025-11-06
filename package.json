@@ -57,12 +57,16 @@
     "sonner": "*",
     "tailwind-merge": "*",
     "vaul": "*",
-    "ws": "*"
+    "ws": "*",
+    "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
     "@vitejs/plugin-react-swc": "^3.10.2",
-    "vite": "5.4.11"
+    "vite": "5.4.11",
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.35",
+    "autoprefixer": "^10.4.17"
   },
   "scripts": {
     "dev": "vite",
