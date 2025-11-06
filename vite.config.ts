@@ -16,10 +16,7 @@
     css: {
       postcss: './postcss.config.cjs',
     },
-    build: {
-      target: 'esnext',
-      outDir: 'build',
-    },
+    build: { outDir: 'build' },
     server: {
       port: 3000,
       open: true,
