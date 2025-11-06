@@ -14,17 +14,4 @@ export default defineConfig({
     port: 5173,
     host: true,
   },
-  build: {
-    outDir: 'dist',
-    sourcemap: false,
-    emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'ui-vendor': ['lucide-react', 'recharts'],
-        },
-      },
-    },
-  },
 })
