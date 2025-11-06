@@ -10,6 +10,7 @@ module.exports = {
     "./services/**/*.{ts,tsx}",
     "./types/**/*.{ts,tsx}",
     "./utils/**/*.{ts,tsx}",
+    "./**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
