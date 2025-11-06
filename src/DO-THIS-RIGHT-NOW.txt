@@ -1,0 +1,165 @@
+╔═══════════════════════════════════════════════════════════════╗
+║          ⚡ DO THIS RIGHT NOW - 2 MINUTE FIX ⚡               ║
+╚═══════════════════════════════════════════════════════════════╝
+
+THE PROBLEM IS IDENTIFIED!
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+Your console log shows exactly what's wrong:
+
+  Backend expects: fancy-trader2.vercel.app  (OLD)
+  Frontend is at:  fancy-trader.vercel.app   (NEW)
+  
+  → URLs don't match → CORS blocks it!
+
+═══════════════════════════════════════════════════════════════
+
+THE FIX:
+━━━━━━━
+
+Update ONE environment variable in Railway.
+
+That's it. Nothing else.
+
+═══════════════════════════════════════════════════════════════
+
+STEP-BY-STEP (DO THIS NOW):
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+□ 1. Open https://railway.app in a new tab
+
+□ 2. Log in to your account
+
+□ 3. Click on "fancy-trader" project
+
+□ 4. Click on your backend service 
+     (the one with Node.js/Express)
+
+□ 5. Click the "Variables" tab at the top
+
+□ 6. Scroll down to find "FRONTEND_URL"
+
+□ 7. Click the edit button (pencil icon)
+
+□ 8. Change the value from:
+     https://fancy-trader2.vercel.app
+     
+     To:
+     https://fancy-trader.vercel.app
+     
+     (Remove the "2")
+
+□ 9. Click "Save" or press Enter
+
+□ 10. Wait 60-90 seconds for Railway to redeploy
+      (You'll see "Deploying..." status)
+
+═══════════════════════════════════════════════════════════════
+
+VERIFY IT WORKED:
+━━━━━━━━━━━━━━━━
+
+After Railway shows "Deployed":
+
+□ 1. Go back to your frontend tab
+     https://fancy-trader.vercel.app
+
+□ 2. Click the "Test" button (top-right)
+
+□ 3. Click "Run Connection Tests"
+
+□ 4. Wait 5 seconds
+
+□ 5. You should see:
+     ✅ Health Check - Backend is alive!
+     ✅ Setups API - Got X setups
+     ✅ CORS Headers - CORS is configured
+     ✅ WebSocket - WebSocket connected!
+
+□ 6. Close test modal
+
+□ 7. Click "Go Live" button
+
+□ 8. Toast notification: "Connected to Backend"
+
+□ 9. Mock data disappears
+
+□ 10. Real trading setups appear!
+
+═══════════════════════════════════════════════════════════════
+
+IF YOU DON'T HAVE ACCESS TO RAILWAY:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Alternative: Update backend code directly
+
+Edit: backend/src/index.ts (line 26)
+
+Change from:
+  app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    credentials: true
+  }));
+
+To:
+  app.use(cors({
+    origin: [
+      'http://localhost:5173',
+      'https://fancy-trader.vercel.app',
+      'https://fancy-trader2.vercel.app',
+    ],
+    credentials: true
+  }));
+
+Then push to GitHub, Railway auto-deploys.
+
+═══════════════════════════════════════════════════════════════
+
+WHY IS THIS HAPPENING?
+━━━━━━━━━━━━━━━━━━━━
+
+You probably:
+  1. Had an old deployment: fancy-trader2.vercel.app
+  2. Created new deployment: fancy-trader.vercel.app
+  3. Backend still points to old URL
+  4. CORS blocks the new URL
+
+Simple fix: Update the URL! 🎯
+
+═══════════════════════════════════════════════════════════════
+
+TIMING:
+━━━━━━
+
+  □ Finding the variable: 30 seconds
+  □ Editing it: 10 seconds
+  □ Railway redeploy: 60 seconds
+  □ Testing: 20 seconds
+  
+  TOTAL: 2 minutes! ⏱️
+
+═══════════════════════════════════════════════════════════════
+
+AFTER THIS FIX YOU'LL HAVE:
+━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✅ Real-time market data from Polygon.io
+  ✅ Live setup detection
+  ✅ WebSocket price updates
+  ✅ No more mock data!
+  ✅ Full backend integration working
+
+═══════════════════════════════════════════════════════════════
+
+READY? GO DO IT NOW! 🚀
+
+1. Open Railway
+2. Change FRONTEND_URL variable
+3. Save
+4. Wait 90 seconds
+5. Test
+6. Success!
+
+IT'S THAT SIMPLE! ⚡
+
+═══════════════════════════════════════════════════════════════
