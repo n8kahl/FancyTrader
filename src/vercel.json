@@ -1,7 +1,7 @@
 {
   "outputDirectory": "build",
-  "installCommand": "echo '🔍 BEFORE INSTALL:' && npm list vite || true && rm -rf node_modules package-lock.json && npm install --save-exact vite@5.4.11 @vitejs/plugin-react@4.2.1 --legacy-peer-deps && npm install --legacy-peer-deps && echo '✅ AFTER INSTALL:' && npm list vite",
-  "buildCommand": "echo '🚀 BUILDING WITH:' && npx vite --version && npx vite@5.4.11 build && echo '📊 CSS SIZE:' && ls -lh build/assets/*.css",
+  "installCommand": "rm -rf node_modules package-lock.json .npmrc && echo 'engine-strict=true' > .npmrc && echo 'legacy-peer-deps=false' >> .npmrc && npm install --force && npm list vite",
+  "buildCommand": "npx vite@5.4.11 build && ls -lh build/assets/*.css",
   "framework": null,
   "cache": []
 }
