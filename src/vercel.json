@@ -1,3 +1,7 @@
 {
-  "outputDirectory": "build"
+  "outputDirectory": "build",
+  "installCommand": "npm ci --legacy-peer-deps",
+  "buildCommand": "npm run build",
+  "framework": null,
+  "cache": []
 }
