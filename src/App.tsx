@@ -115,14 +115,12 @@ export default function App() {
 
   // Update trades when backend data changes
   useEffect(() => {
-    if (!useMockData && backendTrades.length > 0) {
-      // Use real backend data when available
+    if (!useMockData) {
+      // Use backend data even if it’s empty (0 setups)
       logger.info(`📊 Using ${backendTrades.length} trades from backend`);
       setTrades(backendTrades);
-    } else if (useMockData || (backendError && !isConnected)) {
-      // Show mock data when:
-      // 1. User explicitly enabled mock mode, OR
-      // 2. Backend connection failed/unavailable
+    } else {
+      // Mock mode explicitly requested by the user
       logger.info(`🎭 Using ${mockTrades.length} mock trades`);
       setTrades(mockTrades.map(trade => ({
         ...trade,
@@ -130,7 +128,7 @@ export default function App() {
         alertHistory: trade.alertHistory || [],
       })));
     }
-  }, [backendTrades, useMockData, backendError, isConnected]);
+  }, [backendTrades, useMockData]);
 
   // Subscribe to watchlist symbols when connected
   useEffect(() => {
