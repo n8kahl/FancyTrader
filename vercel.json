@@ -1,6 +1,5 @@
 {
-  "installCommand": "npm ci",
+  "framework": "vite",
   "buildCommand": "npx vite@5.4.11 build",
-  "outputDirectory": "build",
-  "framework": "vite"
+  "outputDirectory": "build"
 }
