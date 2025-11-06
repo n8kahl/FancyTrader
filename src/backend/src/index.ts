@@ -24,35 +24,22 @@ const PORT = process.env.PORT || 8080;
 app.use(helmet());
 app.use(compression());
 
-// CORS Configuration - Allow frontend origins + preview deployments
-const allowedOrigins = process.env.FRONTEND_ORIGINS 
-  ? process.env.FRONTEND_ORIGINS.split(',').map(o => o.trim())
-  : ['http://localhost:5173', 'https://fancy-trader.vercel.app'];
-
-// Regex to match Vercel preview URLs: fancy-trader-abc123.vercel.app
-const previewRegex = /^https:\/\/fancy-trader(-[a-z0-9]+)?\.vercel\.app$/;
+const allowedOrigins = (process.env.FRONTEND_ORIGINS || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    // Check exact match
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS not allowed for this origin: ${origin}`));
     }
-    
-    // Check preview URL regex
-    if (previewRegex.test(origin)) {
-      return callback(null, true);
-    }
-    
-    // Reject
-    callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+}));
+
 }));
 
 app.use(express.json());
