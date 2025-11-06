@@ -1,27 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import { buildLoggerPlugin } from './vite.config.build-logger'
-import tailwindcss from 'tailwindcss'
-import autoprefixer from 'autoprefixer'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    buildLoggerPlugin(), // Add detailed build logging
-  ],
+  plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
-    },
-  },
-  css: {
-    postcss: {
-      plugins: [
-        tailwindcss('./tailwind.config.cjs'),
-        autoprefixer,
-      ],
     },
   },
   server: {
@@ -32,7 +18,6 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     emptyOutDir: true,
-    cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks: {
