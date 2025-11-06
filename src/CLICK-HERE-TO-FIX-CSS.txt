@@ -1,0 +1,58 @@
+╔════════════════════════════════════════════════════════════╗
+║                                                            ║
+║              🚨 YOUR CSS IS ONLY 1.68 KB 🚨               ║
+║                                                            ║
+║            THIS IS BECAUSE YOU HAVEN'T PUSHED             ║
+║              THE FIX TO GITHUB YET!                       ║
+║                                                            ║
+╚════════════════════════════════════════════════════════════╝
+
+
+The 1.68 KB you're seeing is from an OLD build.
+
+You need to PUSH the fix to GitHub to trigger a NEW Vercel deploy.
+
+
+═══════════════════════════════════════════════════════════
+🚀 RUN THIS ONE COMMAND:
+═══════════════════════════════════════════════════════════
+
+bash DEPLOY-CSS-FIX-TO-VERCEL.sh
+
+
+That's it! The script will:
+  1. Push .npmrc to GitHub
+  2. Push vercel.json to GitHub  
+  3. Trigger Vercel auto-deploy
+  4. Show you what to watch for
+
+
+═══════════════════════════════════════════════════════════
+📊 AFTER RUNNING THE SCRIPT:
+═══════════════════════════════════════════════════════════
+
+Go to: https://vercel.com/n8kahls-projects/fancy-trader2/deployments
+
+Click the latest deployment.
+
+Look for in the build log:
+
+  ✅ AFTER INSTALL: vite@5.4.11
+  🚀 BUILDING WITH: 5.4.11
+  vite v5.4.11 building for production...
+  📊 CSS SIZE: build/assets/index-*.css  52.3 KB
+
+
+═══════════════════════════════════════════════════════════
+⚡ THIS WILL FIX THE CSS!
+═══════════════════════════════════════════════════════════
+
+The vercel.json deletes node_modules and installs Vite 5.4.11
+FIRST, which guarantees the correct version.
+
+Your CSS will go from 1.68 KB → 50+ KB.
+
+
+RUN NOW:
+
+bash DEPLOY-CSS-FIX-TO-VERCEL.sh
