@@ -16,7 +16,7 @@
     css: {
       postcss: './postcss.config.cjs',
     },
-    build: { outDir: 'build' },
+    build: { outDir: 'dist' },
     server: {
       port: 3000,
       open: true,
