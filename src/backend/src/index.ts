@@ -24,23 +24,54 @@ const PORT = process.env.PORT || 8080;
 app.use(helmet());
 app.use(compression());
 
+const defaultAllowedOrigins = [
+  'http://localhost:5173',
+  'https://fancy-trader.vercel.app',
+];
+
 const allowedOrigins = (process.env.FRONTEND_ORIGINS || '')
   .split(',')
   .map(origin => origin.trim())
   .filter(Boolean);
 
+if (allowedOrigins.length === 0) {
+  allowedOrigins.push(...defaultAllowedOrigins);
+}
+
+const corsAllowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
+const corsAllowedHeaders = ['Content-Type', 'Authorization', 'X-Requested-With'];
+
+const previewRegex = /^https:\/\/fancy-trader(-[a-z0-9-]+)?\.vercel\.app$/;
+
+const resolveAllowedOrigin = (origin?: string) => {
+  if (origin && (allowedOrigins.includes(origin) || previewRegex.test(origin))) {
+    return origin;
+  }
+  return allowedOrigins[0];
+};
+
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
+    if (!origin || allowedOrigins.includes(origin) || previewRegex.test(origin)) {
+      callback(null, resolveAllowedOrigin(origin || undefined));
     } else {
       callback(new Error(`CORS not allowed for this origin: ${origin}`));
     }
   },
   credentials: true,
+  methods: corsAllowedMethods,
+  allowedHeaders: corsAllowedHeaders,
+  optionsSuccessStatus: 204,
 }));
 
-}));
+app.options('*', (req, res) => {
+  const allowedOrigin = resolveAllowedOrigin(req.headers.origin as string | undefined);
+  res.header('Access-Control-Allow-Origin', allowedOrigin);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', corsAllowedMethods.join(', '));
+  res.header('Access-Control-Allow-Headers', corsAllowedHeaders.join(', '));
+  res.sendStatus(204);
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
