@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "postinstall": "echo '✅ Installed Vite:' && npm list vite && echo '✅ Installed Tailwind:' && npm list tailwindcss && echo '✅ Installed PostCSS:' && npm list postcss",
-    "build": "vite build",
+    "postinstall": "node verify-vite-version.js",
+    "build": "node verify-vite-version.js && vite build",
     "build:check": "tsc && vite build",
     "build:verify": "npm run build && node verify-css-build.js",
     "preview": "vite preview",
