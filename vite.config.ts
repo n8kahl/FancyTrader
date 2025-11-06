@@ -13,10 +13,10 @@
         '@': path.resolve(__dirname, './src'),
       },
     },
-    css: {
-      postcss: './postcss.config.cjs',
+    build: {
+      target: 'esnext',
+      outDir: 'build',
     },
-    build: { outDir: 'dist' },
     server: {
       port: 3000,
       open: true,

@@ -1,0 +1,7 @@
+{
+  "outputDirectory": "build",
+  "installCommand": "echo '🧹 Cleaning...' && rm -rf node_modules package-lock.json .npmrc && echo '⚙️ Creating .npmrc...' && echo 'engine-strict=true' > .npmrc && echo 'legacy-peer-deps=false' >> .npmrc && echo '📦 Installing dependencies...' && npm install --force && echo '✅ Install complete!' && echo '' && echo '🔍 VERIFICATION:' && echo '  Package.json name:' && grep '\"name\"' package.json | head -1 && echo '  Package.json vite:' && grep '\"vite\"' package.json && echo '  Installed vite:' && npm list vite --depth=0 && echo '  Vite binary:' && ls -la node_modules/.bin/vite && echo ''",
+  "buildCommand": "echo '🚀 BUILD STARTING...' && echo '  Using explicit vite version...' && npx vite@5.4.11 build && echo '' && echo '✅ BUILD SUCCESS!' && echo '📊 Output files:' && ls -lh build/assets/ && echo '' && echo '📏 CSS sizes:' && ls -lh build/assets/*.css",
+  "framework": null,
+  "cache": []
+}

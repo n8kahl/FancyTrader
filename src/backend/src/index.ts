@@ -29,45 +29,31 @@ const allowedOrigins = process.env.FRONTEND_ORIGINS
   ? process.env.FRONTEND_ORIGINS.split(',').map(o => o.trim())
   : ['http://localhost:5173', 'https://fancy-trader.vercel.app'];
 
-const corsAllowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'];
-const corsAllowedHeaders = ['Content-Type', 'Authorization', 'X-Requested-With'];
-
 // Regex to match Vercel preview URLs: fancy-trader-abc123.vercel.app
-const previewRegex = /^https:\/\/fancy-trader(-[a-z0-9-]+)?\.vercel\.app$/;
-
-const isOriginAllowed = (origin?: string) => {
-  if (!origin) return true;
-  if (allowedOrigins.includes(origin)) return true;
-  return previewRegex.test(origin);
-};
+const previewRegex = /^https:\/\/fancy-trader(-[a-z0-9]+)?\.vercel\.app$/;
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (isOriginAllowed(origin)) {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    // Check exact match
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
+    
+    // Check preview URL regex
+    if (previewRegex.test(origin)) {
+      return callback(null, true);
+    }
+    
+    // Reject
     callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
   credentials: true,
-  methods: corsAllowedMethods,
-  allowedHeaders: corsAllowedHeaders,
-  optionsSuccessStatus: 204,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
 }));
-
-app.options('*', (req, res) => {
-  const requestOrigin = req.headers.origin;
-
-  if (requestOrigin && isOriginAllowed(requestOrigin)) {
-    res.header('Access-Control-Allow-Origin', requestOrigin);
-  } else if (!requestOrigin && allowedOrigins.length > 0) {
-    res.header('Access-Control-Allow-Origin', allowedOrigins[0]);
-  }
-
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Methods', corsAllowedMethods.join(', '));
-  res.header('Access-Control-Allow-Headers', corsAllowedHeaders.join(', '));
-  return res.sendStatus(204);
-});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

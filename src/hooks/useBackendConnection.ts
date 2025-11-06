@@ -4,6 +4,7 @@ import { apiClient } from '../services/apiClient';
 import type { Trade } from '../components/TradeCard';
 import { logger } from '../utils/logger';
 import { toast } from 'sonner';
+import { getBackendUrl } from '../utils/env';
 
 interface BackendConnectionState {
   isConnected: boolean;
@@ -226,18 +227,22 @@ export function useBackendConnection(autoConnect: boolean = true) {
         fetchSetups();
       })
       .catch((error) => {
-        logger.warn('⚠️ Backend not available - using mock data mode');
-        logger.info('💡 To connect to backend: Start backend server with "cd backend && npm run dev"');
+        logger.error('❌ Backend health check failed:', error);
+        logger.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          cause: error.cause,
+        });
         
         setState(prev => ({
           ...prev,
-          error: 'Backend not available',
+          error: error.message || 'Backend not available',
           isLoading: false,
         }));
         
-        toast.info('Using Mock Data', {
-          description: 'Backend not running. Click "Go Live" after starting backend.',
-          duration: 4000,
+        toast.error('Backend Connection Failed', {
+          description: `Cannot connect to ${getBackendUrl()}. Check console for details.`,
+          duration: 6000,
         });
       });
 

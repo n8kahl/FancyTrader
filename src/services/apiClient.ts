@@ -9,6 +9,8 @@ import type { WatchlistSymbol } from '../config/watchlist';
 class ApiClient {
   private async fetch<T>(url: string, options?: RequestInit): Promise<T> {
     try {
+      logger.info(`🌐 API Request: ${options?.method || 'GET'} ${url}`);
+      
       const response = await fetch(url, {
         ...options,
         headers: {
@@ -19,18 +21,25 @@ class ApiClient {
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({ error: response.statusText }));
+        logger.error(`❌ API Error: ${response.status} ${response.statusText}`, error);
         throw new Error(error.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return response.json();
+      const data = await response.json();
+      logger.info(`✅ API Success: ${options?.method || 'GET'} ${url}`);
+      return data;
     } catch (error: any) {
-      // Only log as debug if it's a connection error (backend not running)
-      if (error.message?.includes('fetch') || error.name === 'TypeError') {
-        logger.debug(`Backend not reachable: ${url}`);
+      if (error.message?.includes('fetch') || error.name === 'TypeError' || error.message?.includes('Failed to fetch')) {
+        logger.error(`🔌 Backend not reachable at ${url}`, {
+          message: error.message,
+          name: error.name,
+          type: 'CONNECTION_ERROR',
+        });
+        throw new Error(`Cannot connect to backend at ${url}. Is it running?`);
       } else {
-        logger.error(`API request failed: ${url}`, error);
+        logger.error(`❌ API request failed: ${url}`, error);
+        throw error;
       }
-      throw error;
     }
   }
 
