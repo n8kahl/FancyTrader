@@ -7,9 +7,9 @@
 const LOCAL_HTTP_URL = 'http://localhost:8080';
 const LOCAL_WS_URL = 'ws://localhost:8080/ws';
 
-// For Railway production (update after deployment)
-const PRODUCTION_HTTP_URL = (import.meta.env?.VITE_BACKEND_URL as string) || 'https://your-app.railway.app';
-const PRODUCTION_WS_URL = (import.meta.env?.VITE_BACKEND_WS_URL as string) || 'wss://your-app.railway.app/ws';
+// For Railway production
+const PRODUCTION_HTTP_URL = (import.meta.env?.VITE_BACKEND_URL as string) || 'https://fancy-trader.up.railway.app';
+const PRODUCTION_WS_URL = (import.meta.env?.VITE_BACKEND_WS_URL as string) || 'wss://fancy-trader.up.railway.app/ws';
 
 // Auto-detect environment
 const isDevelopment = import.meta.env?.DEV ?? true;
