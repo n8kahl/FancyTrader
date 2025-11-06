@@ -1,3 +1,48 @@
+# 🚨 BUILD FAILING - POSTINSTALL SCRIPT ERROR
+
+## 🔍 THE ERROR:
+
+```
+Error: Cannot find module '/vercel/path0/verify-vite-version.js'
+npm error command sh -c node verify-vite-version.js
+```
+
+## 💡 THE PROBLEM:
+
+The `postinstall` script runs during `npm install` in Vercel BEFORE all your files are copied to the build directory. So it can't find `verify-vite-version.js`.
+
+We don't need `postinstall` - we only need the verification in the `build` script (which already has it).
+
+---
+
+## ✅ THE FIX:
+
+I've removed the `postinstall` script from package.json in Figma Make.
+
+**You need to do the same locally:**
+
+### **Option A: Edit manually (30 seconds)**
+
+Open `/Users/natekahl/Desktop/FancyTrader/package.json`
+
+Find line 8:
+```json
+"postinstall": "node verify-vite-version.js",
+```
+
+**DELETE THAT ENTIRE LINE** (including the comma at the end)
+
+Save the file.
+
+---
+
+### **Option B: Use this command (faster)**
+
+```bash
+cd /Users/natekahl/Desktop/FancyTrader
+
+# Edit package.json to remove postinstall line
+cat > package.json << 'EOF'
 {
   "name": "fancy-trader",
   "version": "1.0.1",
@@ -5,8 +50,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node verify-vite-version.js && vite build",
     "build:check": "tsc && vite build",
+    "build:verify": "npm run build && node verify-css-build.js",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
@@ -81,3 +127,61 @@
     "@vitejs/plugin-react": "4.2.1"
   }
 }
+EOF
+```
+
+---
+
+## ✅ THEN COMMIT AND PUSH:
+
+```bash
+git add package.json
+git commit -m "Fix: Remove postinstall script causing Vercel build failure"
+git push
+```
+
+---
+
+## 🎯 WHAT WILL HAPPEN:
+
+After you push, Vercel will:
+
+1. ✅ `npm install` will complete (no postinstall script to fail)
+2. ✅ `npm run build` will run the verification script
+3. ✅ Vite will build with version 5.4.11
+4. ✅ CSS will be compiled to 127+ KB
+5. ✅ Deployment succeeds!
+
+---
+
+## 📋 QUICK CHECKLIST:
+
+```
+[ ] Remove "postinstall": "node verify-vite-version.js", from package.json (line 8)
+[ ] git add package.json
+[ ] git commit -m "Fix: Remove postinstall script"
+[ ] git push
+[ ] Wait for Vercel rebuild (2 minutes)
+[ ] Check build log for success
+```
+
+---
+
+## 💡 WHY THIS WORKS:
+
+**Before:**
+```
+npm install → postinstall runs → verify-vite-version.js not found yet → BUILD FAILS ❌
+```
+
+**After:**
+```
+npm install → no postinstall → SUCCESS ✅
+npm run build → verify-vite-version.js runs → vite builds → SUCCESS ✅
+```
+
+---
+
+🚀 **USE OPTION B COMMAND TO FIX AND PUSH NOW!** 🚀
+
+The script runs all at once - just copy the entire block and paste it in Terminal!

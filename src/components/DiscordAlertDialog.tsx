@@ -12,7 +12,7 @@ import { Textarea } from "./ui/textarea";
 import { Badge } from "./ui/badge";
 import { Send, CheckCircle2 } from "lucide-react";
 import type { Trade } from "./TradeCard";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface DiscordAlertDialogProps {
   trade: Trade | null;

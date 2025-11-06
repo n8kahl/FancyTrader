@@ -29,7 +29,7 @@ import {
   WifiOff
 } from "lucide-react";
 import { Toaster } from "./components/ui/sonner";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { ALL_STRATEGIES } from "./config/strategies";
 import { DEFAULT_WATCHLIST, type WatchlistSymbol } from "./config/watchlist";
 import { type OptionsContract, type AlertType, type TradeAlert, type PositionTracking, calculatePositionPL } from "./types/options";
