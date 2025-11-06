@@ -6,7 +6,10 @@
 ✅ **Dependencies fixed** (`tailwindcss-animate` added)
 ✅ **Environment helpers created**
 ✅ **Diagnostic tools added**
+✅ **Comprehensive logging added** (see `LOGGING-GUIDE.md`)
 ❌ **CSS not loading** (Vercel has cached broken build)
+
+> **Note:** Extensive logging has been added at every level (build, runtime, diagnostic panel). See `LOGGING-GUIDE.md` for details.
 
 ---
 

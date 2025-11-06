@@ -22,54 +22,88 @@ export function DiagnosticPanel() {
     runDiagnostics();
   }, []);
 
-  const runDiagnostics = () => {
-    console.log("🔍 Running diagnostics...");
-    
-    const diag = {
-      timestamp: new Date().toISOString(),
+  const runDiagnostics = async () => {
+    try {
+      console.log("🔍 Running comprehensive diagnostics...");
+      console.log("━".repeat(80));
       
-      // Environment
-      environment: {
-        isDev: isDev(),
-        mode: getMode(),
-        backendUrl: BACKEND_CONFIG.httpUrl,
-        backendWsUrl: BACKEND_CONFIG.wsUrl,
-        envVars: {
-          VITE_BACKEND_URL: getBackendUrl(),
-          VITE_BACKEND_WS_URL: getBackendWsUrl(),
-        }
-      },
+      // Get CSS file details with error handling
+      let cssDetails;
+      try {
+        cssDetails = await getCSSFileDetails();
+      } catch (e) {
+        console.error("Error fetching CSS details:", e);
+        cssDetails = { size: 'Error', status: 'fetch failed', preview: '' };
+      }
       
-      // CSS Loading
-      css: {
-        stylesheets: Array.from(document.styleSheets).map((sheet, idx) => {
+      const diag = {
+        timestamp: new Date().toISOString(),
+        
+        // Environment
+        environment: {
+          isDev: isDev(),
+          mode: getMode(),
+          backendUrl: BACKEND_CONFIG.httpUrl,
+          backendWsUrl: BACKEND_CONFIG.wsUrl,
+          envVars: {
+            VITE_BACKEND_URL: getBackendUrl(),
+            VITE_BACKEND_WS_URL: getBackendWsUrl(),
+          }
+        },
+        
+        // CSS Loading (Enhanced)
+        css: {
+          stylesheets: Array.from(document.styleSheets).map((sheet, idx) => {
+            try {
+              const rules = sheet.cssRules ? Array.from(sheet.cssRules) : [];
+              const firstRules = rules.slice(0, 5).map((rule: any) => rule.cssText?.substring(0, 80));
+              
+              return {
+                index: idx,
+                href: sheet.href || 'inline',
+                rules: sheet.cssRules?.length || 0,
+                disabled: sheet.disabled,
+                firstRules: firstRules,
+                hasTailwindUtilities: checkSheetForTailwind(sheet),
+              };
+            } catch (e) {
+              return {
+                index: idx,
+                href: sheet.href || 'inline',
+                error: 'CORS or access error',
+                disabled: sheet.disabled
+              };
+            }
+          }),
+          totalStylesheets: document.styleSheets.length,
+          tailwindLoaded: checkTailwindLoaded(),
+          cssFileSize: cssDetails.size,
+          cssFileStatus: cssDetails.status,
+          cssFirstBytes: cssDetails.preview,
+        },
+        
+        // DOM
+        dom: (() => {
           try {
             return {
-              index: idx,
-              href: sheet.href || 'inline',
-              rules: sheet.cssRules?.length || 0,
-              disabled: sheet.disabled
+              hasCSSClasses: checkDOMHasClasses(),
+              bodyClasses: document.body.className || '',
+              htmlClasses: document.documentElement.className || '',
+              rootElement: !!document.getElementById('root'),
+              tailwindClasses: findTailwindClasses(),
             };
           } catch (e) {
+            console.error("Error analyzing DOM:", e);
             return {
-              index: idx,
-              href: sheet.href || 'inline',
-              error: 'CORS or access error',
-              disabled: sheet.disabled
+              hasCSSClasses: false,
+              bodyClasses: 'error',
+              htmlClasses: 'error',
+              rootElement: false,
+              tailwindClasses: [],
+              error: String(e)
             };
           }
-        }),
-        totalStylesheets: document.styleSheets.length,
-        tailwindLoaded: checkTailwindLoaded(),
-      },
-      
-      // DOM
-      dom: {
-        hasCSSClasses: checkDOMHasClasses(),
-        bodyClasses: document.body.className,
-        htmlClasses: document.documentElement.className,
-        rootElement: !!document.getElementById('root'),
-      },
+        })(),
       
       // Build Info
       build: {
@@ -77,6 +111,7 @@ export function DiagnosticPanel() {
         location: window.location.href,
         protocol: window.location.protocol,
         baseUrl: window.location.origin,
+        buildTime: document.querySelector('meta[name="build-time"]')?.getAttribute('content') || 'unknown',
       },
       
       // Browser
@@ -84,11 +119,137 @@ export function DiagnosticPanel() {
         online: navigator.onLine,
         cookiesEnabled: navigator.cookieEnabled,
         language: navigator.language,
-      }
+      },
+      
+      // Performance
+      performance: (() => {
+        try {
+          return {
+            cssLoadTime: getCSSLoadTime(),
+            domContentLoaded: performance.timing?.domContentLoadedEventEnd - performance.timing?.navigationStart || 'N/A',
+            loadComplete: performance.timing?.loadEventEnd - performance.timing?.navigationStart || 'N/A',
+          };
+        } catch (e) {
+          console.error("Error getting performance metrics:", e);
+          return {
+            cssLoadTime: 0,
+            domContentLoaded: 'Error',
+            loadComplete: 'Error',
+            error: String(e)
+          };
+        }
+      })()
     };
     
-    console.log("📊 Diagnostics Results:", diag);
+    console.log("📊 DIAGNOSTICS RESULTS:");
+    console.log("━".repeat(80));
+    console.log("🌐 Environment:", diag.environment);
+    console.log("🎨 CSS Status:", diag.css);
+    console.log("📄 DOM Status:", diag.dom);
+    console.log("🏗️ Build Info:", diag.build);
+    console.log("🌍 Browser:", diag.browser);
+    console.log("⚡ Performance:", diag.performance);
+    console.log("━".repeat(80));
+    console.log("📋 Copy this JSON to share:", JSON.stringify(diag, null, 2));
+    console.log("━".repeat(80));
+    
     setDiagnostics(diag);
+    } catch (error) {
+      console.error("❌ Fatal error in diagnostics:", error);
+      setDiagnostics({
+        timestamp: new Date().toISOString(),
+        error: String(error),
+        message: "Failed to run diagnostics. Check console for details."
+      });
+    }
+  };
+
+  const getCSSFileDetails = async () => {
+    const cssLink = Array.from(document.styleSheets).find(sheet => 
+      sheet.href && sheet.href.includes('index-') && sheet.href.includes('.css')
+    );
+    
+    if (!cssLink?.href) {
+      return { size: 'N/A', status: 'not found', preview: '' };
+    }
+
+    try {
+      const response = await fetch(cssLink.href, { method: 'HEAD' });
+      const size = response.headers.get('content-length');
+      const status = response.status;
+      
+      // Try to get first few bytes
+      const previewResponse = await fetch(cssLink.href);
+      const text = await previewResponse.text();
+      const preview = text.substring(0, 500);
+      
+      console.log("📄 CSS File Analysis:");
+      console.log("  URL:", cssLink.href);
+      console.log("  Size:", size ? `${(parseInt(size) / 1024).toFixed(2)} KB` : 'Unknown');
+      console.log("  Status:", status);
+      console.log("  First 500 chars:", preview);
+      
+      return {
+        size: size ? `${(parseInt(size) / 1024).toFixed(2)} KB` : 'Unknown',
+        status: status,
+        preview: preview
+      };
+    } catch (e) {
+      console.error("❌ Error fetching CSS file:", e);
+      return { size: 'Error', status: 'fetch failed', preview: '' };
+    }
+  };
+
+  const checkSheetForTailwind = (sheet: CSSStyleSheet): boolean => {
+    try {
+      const rules = sheet.cssRules;
+      if (!rules) return false;
+      
+      // Look for common Tailwind utility patterns
+      const tailwindPatterns = ['.bg-', '.text-', '.flex', '.grid', '.rounded', '.border'];
+      for (let i = 0; i < Math.min(rules.length, 100); i++) {
+        const rule = rules[i] as CSSStyleRule;
+        if (rule.selectorText) {
+          for (const pattern of tailwindPatterns) {
+            if (rule.selectorText.includes(pattern)) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
+  const findTailwindClasses = (): string[] => {
+    const classes = new Set<string>();
+    const elements = document.querySelectorAll('[class]');
+    elements.forEach(el => {
+      // Handle both regular elements and SVG elements
+      const className = typeof el.className === 'string' 
+        ? el.className 
+        : el.className?.baseVal || '';
+      
+      if (className) {
+        const classList = className.split(' ');
+        classList.forEach(cls => {
+          if (cls && cls.match(/^(bg-|text-|flex|grid|rounded|border|p-|m-|w-|h-)/)) {
+            classes.add(cls);
+          }
+        });
+      }
+    });
+    return Array.from(classes).slice(0, 20);
+  };
+
+  const getCSSLoadTime = (): number => {
+    const perfEntries = performance.getEntriesByType('resource');
+    const cssEntry = perfEntries.find((entry: any) => 
+      entry.name.includes('.css') && entry.name.includes('index-')
+    );
+    return cssEntry ? Math.round((cssEntry as any).duration) : 0;
   };
 
   const checkTailwindLoaded = (): boolean => {
