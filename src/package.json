@@ -1,11 +1,11 @@
 {
   "name": "fancy-trader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "KCU real-time LTP setup monitor and Discord alerts system",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "rm -rf node_modules/.vite && vite build",
     "build:check": "tsc && vite build",
     "build:verify": "npm run build && node verify-css-build.js",
     "preview": "vite preview",
@@ -53,7 +53,10 @@
     "react-resizable-panels": "^2.0.11",
     "vaul": "^0.9.0",
     "input-otp": "^1.2.4",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.35",
+    "autoprefixer": "^10.4.17"
   },
   "devDependencies": {
     "@types/react": "^18.2.55",
@@ -61,12 +64,9 @@
     "@typescript-eslint/eslint-plugin": "^6.21.0",
     "@typescript-eslint/parser": "^6.21.0",
     "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.17",
     "eslint": "^8.56.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
-    "postcss": "^8.4.35",
-    "tailwindcss": "^3.4.1",
     "typescript": "^5.2.2",
     "vite": "^5.1.0"
   },
