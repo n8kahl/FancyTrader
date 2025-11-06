@@ -1,0 +1,71 @@
+╔════════════════════════════════════════════════════════════╗
+║                  GITHUB WEB INTERFACE FIX                 ║
+╚════════════════════════════════════════════════════════════╝
+
+STEP 1: Go to GitHub
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+https://github.com/n8kahl/FancyTrader
+
+
+STEP 2: Click on "vercel.json" file
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+You'll see it in the root directory file list.
+
+
+STEP 3: Click the Pencil Icon (✏️ Edit this file)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Top right corner of the file viewer.
+
+
+STEP 4: DELETE ALL EXISTING CONTENT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Select all (Ctrl+A or Cmd+A) and delete.
+
+
+STEP 5: PASTE THIS EXACT CONTENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{
+  "outputDirectory": "build",
+  "installCommand": "rm -rf node_modules package-lock.json .npmrc && echo 'engine-strict=true' > .npmrc && echo 'legacy-peer-deps=false' >> .npmrc && npm install --force && npm list vite",
+  "buildCommand": "npx vite@5.4.11 build && ls -lh build/assets/*.css",
+  "framework": null,
+  "cache": []
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+STEP 6: Scroll down, add commit message:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Fix CSS: Delete package-lock.json, force Vite 5.4.11
+
+
+STEP 7: Click "Commit changes" (green button)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+STEP 8: Wait 30 seconds, then check Vercel:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+https://vercel.com/n8kahls-projects/fancy-trader2/deployments
+
+Click the latest deployment.
+
+Look for in the build log:
+
+  ✓ rm -rf node_modules package-lock.json
+  ✓ npm install --force
+  ✓ npm list vite
+    vite@5.4.11  ← CORRECT VERSION!
+  ✓ npx vite@5.4.11 build
+  ✓ vite v5.4.11 building for production...
+  ✓ build/assets/index-*.css  52.3 KB  ← CSS FIXED!
+
+
+╔════════════════════════════════════════════════════════════╗
+║                     THAT'S IT! 🎉                         ║
+╚════════════════════════════════════════════════════════════╝
+
+The CSS will be 52 KB instead of 1.68 KB.
+Tailwind will work perfectly.
