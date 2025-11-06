@@ -1,5 +1,6 @@
 {
   "framework": "vite",
+  "installCommand": "npm install",
   "buildCommand": "npx vite@5.4.11 build",
   "outputDirectory": "build"
 }
