@@ -1,0 +1,55 @@
+╔════════════════════════════════════════════════════════════╗
+║              CSS FIX CHECKLIST - TWO FILES                ║
+╚════════════════════════════════════════════════════════════╝
+
+
+□ STEP 1: Edit package.json on GitHub
+  ├─ Go to: https://github.com/n8kahl/FancyTrader
+  ├─ Click: package.json
+  ├─ Click: Edit (✏️ pencil icon)
+  ├─ Select all (Ctrl+A) and delete
+  ├─ Open: COPY-THIS-PACKAGE-JSON.txt
+  ├─ Copy everything
+  ├─ Paste into GitHub editor
+  ├─ Verify line 70 shows: "vite": "5.4.11"
+  ├─ Commit message: "Fix vite version to 5.4.11"
+  └─ Click: Commit changes
+
+
+□ STEP 2: Edit vercel.json on GitHub
+  ├─ Go to: https://github.com/n8kahl/FancyTrader
+  ├─ Click: vercel.json
+  ├─ Click: Edit (✏️ pencil icon)
+  ├─ Select all (Ctrl+A) and delete
+  ├─ Open: COPY-THIS-VERCEL-JSON.txt
+  ├─ Copy everything
+  ├─ Paste into GitHub editor
+  ├─ Commit message: "Fix vercel build commands"
+  └─ Click: Commit changes
+
+
+□ STEP 3: Wait for Vercel deployment (~30 seconds)
+  └─ Watch: https://vercel.com/n8kahls-projects/fancy-trader2/deployments
+
+
+□ STEP 4: Verify build log shows:
+  ├─ ✓ npm install
+  ├─ ✓ added 448 packages
+  ├─ ✓ npm list vite → vite@5.4.11
+  ├─ ✓ npx vite@5.4.11 build
+  ├─ ✓ vite v5.4.11 building for production...
+  └─ ✓ build/assets/index-*.css  52.3 KB
+
+
+═══════════════════════════════════════════════════════════
+
+COPY-PASTE FILES AVAILABLE:
+  • COPY-THIS-PACKAGE-JSON.txt
+  • COPY-THIS-VERCEL-JSON.txt
+
+═══════════════════════════════════════════════════════════
+
+IF YOU'VE ALREADY EDITED VERCEL.JSON:
+  You ONLY need to edit package.json!
+
+═══════════════════════════════════════════════════════════

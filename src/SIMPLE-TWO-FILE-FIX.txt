@@ -1,0 +1,64 @@
+🚨 THE PROBLEM: GitHub has WRONG package.json!
+
+Build log proves it:
+  npm warn dev vite@"6.3.5" from the root project
+                  ↑↑↑↑↑↑
+           GitHub has Vite 6.3.5!
+
+
+═══════════════════════════════════════════════════════════
+
+✅ THE FIX: Edit TWO files on GitHub
+
+═══════════════════════════════════════════════════════════
+
+
+STEP 1: Fix package.json
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Go to: https://github.com/n8kahl/FancyTrader/blob/main/package.json
+
+Click: Edit (✏️)
+Delete all
+Paste from: COPY-THIS-PACKAGE-JSON.txt
+Commit: "Fix vite version to 5.4.11"
+
+
+STEP 2: Fix vercel.json (if not done already)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Go to: https://github.com/n8kahl/FancyTrader/blob/main/vercel.json
+
+Click: Edit (✏️)
+Delete all
+Paste from: COPY-THIS-VERCEL-JSON.txt
+Commit: "Fix vercel build commands"
+
+
+═══════════════════════════════════════════════════════════
+
+IMPORTANT: The key line in package.json is line 70:
+
+    "vite": "5.4.11"
+             ↑↑↑↑↑↑
+        NOT 6.3.5!
+
+═══════════════════════════════════════════════════════════
+
+After committing BOTH files, Vercel will:
+
+1. Read package.json → Install vite@5.4.11 ✅
+2. Read vercel.json → Build with vite@5.4.11 ✅
+3. CSS: 52 KB ✅
+
+═══════════════════════════════════════════════════════════
+
+DO IT NOW:
+1. Edit package.json on GitHub
+2. Edit vercel.json on GitHub
+3. Wait 30 seconds
+4. Check Vercel deployment
+
+https://vercel.com/n8kahls-projects/fancy-trader2/deployments
+
+═══════════════════════════════════════════════════════════

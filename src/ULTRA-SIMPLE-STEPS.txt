@@ -1,0 +1,17 @@
+🚀 FIX CSS IN 3 CLICKS:
+
+1. Go here: https://github.com/n8kahl/FancyTrader
+
+2. Click: vercel.json → Edit (✏️ pencil icon)
+
+3. Replace ALL content with what's in: COPY-THIS-VERCEL-JSON.txt
+
+4. Commit changes
+
+═══════════════════════════════════════════════════════════
+
+DONE! Vercel will auto-deploy with CSS fixed.
+
+Watch: https://vercel.com/n8kahls-projects/fancy-trader2/deployments
+
+Result: CSS 1.68 KB → 52 KB ✅
