@@ -1,6 +1,8 @@
-# Fancy Trader - Frontend
+# 🚀 Fancy Trader
 
 Real-time KCU LTP Setup Monitor and Discord Alerts System with full backend integration.
+
+**Status:** ✅ Ready to deploy (see `DEPLOY.md`)
 
 ## Features
 
@@ -162,19 +164,16 @@ VITE_BACKEND_WS_URL=wss://your-app.railway.app/ws
 
 ## Deployment
 
-### Vercel (Recommended)
+**See `DEPLOY.md` for complete deployment guide.**
+
+### Quick Deploy to Vercel
 
 1. Push to GitHub
-2. Import project in Vercel
-3. Add environment variables
-4. Deploy!
+2. Clear Vercel build cache
+3. Redeploy (with cache disabled)
+4. Verify CSS loads (1000+ rules)
 
-### Netlify
-
-1. Build: `npm run build`
-2. Publish directory: `dist`
-3. Add environment variables
-4. Deploy!
+**Backend:** Already deployed at `https://fancy-trader.up.railway.app`
 
 ## Features Documentation
 
