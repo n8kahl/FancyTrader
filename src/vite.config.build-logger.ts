@@ -39,39 +39,44 @@ export function buildLoggerPlugin(): Plugin {
         console.log('  autoprefixer:', packageJson.devDependencies?.autoprefixer || 'NOT FOUND');
       }
       
-      // Check for Tailwind config
-      const tailwindConfigPath = path.join(process.cwd(), 'tailwind.config.js');
-      console.log('\n⚙️ CONFIGURATION FILES:');
-      console.log('  tailwind.config.js:', fs.existsSync(tailwindConfigPath) ? '✅ EXISTS' : '❌ MISSING');
+      // Check for Tailwind config (.cjs preferred)
+      const tailwindConfigCjs = path.join(process.cwd(), 'tailwind.config.cjs');
+      const tailwindConfigJs = path.join(process.cwd(), 'tailwind.config.js');
       
-      // Validate Tailwind config for module system issues
-      if (fs.existsSync(tailwindConfigPath)) {
-        const tailwindConfig = fs.readFileSync(tailwindConfigPath, 'utf-8');
-        const hasRequire = tailwindConfig.includes('require(');
-        const hasImport = tailwindConfig.includes('import ');
-        const hasExportDefault = tailwindConfig.includes('export default');
-        
-        if (hasRequire && (hasImport || hasExportDefault)) {
-          console.log('  ⚠️ WARNING: Mixed module systems detected in tailwind.config.js');
-          console.log('     (Has both require() and import/export)');
+      console.log('\n⚙️ CONFIGURATION FILES:');
+      
+      if (fs.existsSync(tailwindConfigCjs)) {
+        console.log('  tailwind.config.cjs: ✅ EXISTS (CommonJS - RECOMMENDED)');
+        const tailwindConfig = fs.readFileSync(tailwindConfigCjs, 'utf-8');
+        if (tailwindConfig.includes('module.exports')) {
+          console.log('  ✅ Using module.exports (correct for .cjs)');
         } else {
-          console.log('  ✅ Module system consistent');
+          console.log('  ⚠️ WARNING: .cjs file should use module.exports');
         }
+      } else if (fs.existsSync(tailwindConfigJs)) {
+        console.log('  tailwind.config.js: ✅ EXISTS (may have module issues)');
+        console.log('  💡 Consider renaming to .cjs for better compatibility');
+      } else {
+        console.log('  tailwind.config: ❌ MISSING');
       }
       
-      const postcssConfigPath = path.join(process.cwd(), 'postcss.config.js');
-      console.log('  postcss.config.js:', fs.existsSync(postcssConfigPath) ? '✅ EXISTS' : '❌ MISSING');
+      // Check for PostCSS config (.cjs preferred)
+      const postcssConfigCjs = path.join(process.cwd(), 'postcss.config.cjs');
+      const postcssConfigJs = path.join(process.cwd(), 'postcss.config.js');
       
-      // Validate PostCSS config
-      if (fs.existsSync(postcssConfigPath)) {
-        const postcssConfig = fs.readFileSync(postcssConfigPath, 'utf-8');
-        const hasDirectImports = postcssConfig.includes('import tailwindcss') && postcssConfig.includes('import autoprefixer');
-        
-        if (hasDirectImports) {
-          console.log('  ✅ PostCSS using direct imports (recommended)');
+      if (fs.existsSync(postcssConfigCjs)) {
+        console.log('  postcss.config.cjs: ✅ EXISTS (CommonJS - RECOMMENDED)');
+        const postcssConfig = fs.readFileSync(postcssConfigCjs, 'utf-8');
+        if (postcssConfig.includes('module.exports')) {
+          console.log('  ✅ Using module.exports (correct for .cjs)');
         } else {
-          console.log('  ⚠️ PostCSS using string references (may cause issues)');
+          console.log('  ⚠️ WARNING: .cjs file should use module.exports');
         }
+      } else if (fs.existsSync(postcssConfigJs)) {
+        console.log('  postcss.config.js: ✅ EXISTS (may have module issues)');
+        console.log('  💡 Consider renaming to .cjs for better compatibility');
+      } else {
+        console.log('  postcss.config: ❌ MISSING');
       }
       
       const globalsPath = path.join(process.cwd(), 'styles/globals.css');
