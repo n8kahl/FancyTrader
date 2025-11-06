@@ -44,11 +44,45 @@ export function buildLoggerPlugin(): Plugin {
       console.log('\n⚙️ CONFIGURATION FILES:');
       console.log('  tailwind.config.js:', fs.existsSync(tailwindConfigPath) ? '✅ EXISTS' : '❌ MISSING');
       
+      // Validate Tailwind config for module system issues
+      if (fs.existsSync(tailwindConfigPath)) {
+        const tailwindConfig = fs.readFileSync(tailwindConfigPath, 'utf-8');
+        const hasRequire = tailwindConfig.includes('require(');
+        const hasImport = tailwindConfig.includes('import ');
+        const hasExportDefault = tailwindConfig.includes('export default');
+        
+        if (hasRequire && (hasImport || hasExportDefault)) {
+          console.log('  ⚠️ WARNING: Mixed module systems detected in tailwind.config.js');
+          console.log('     (Has both require() and import/export)');
+        } else {
+          console.log('  ✅ Module system consistent');
+        }
+      }
+      
       const postcssConfigPath = path.join(process.cwd(), 'postcss.config.js');
       console.log('  postcss.config.js:', fs.existsSync(postcssConfigPath) ? '✅ EXISTS' : '❌ MISSING');
       
+      // Validate PostCSS config
+      if (fs.existsSync(postcssConfigPath)) {
+        const postcssConfig = fs.readFileSync(postcssConfigPath, 'utf-8');
+        const hasDirectImports = postcssConfig.includes('import tailwindcss') && postcssConfig.includes('import autoprefixer');
+        
+        if (hasDirectImports) {
+          console.log('  ✅ PostCSS using direct imports (recommended)');
+        } else {
+          console.log('  ⚠️ PostCSS using string references (may cause issues)');
+        }
+      }
+      
       const globalsPath = path.join(process.cwd(), 'styles/globals.css');
       console.log('  styles/globals.css:', fs.existsSync(globalsPath) ? '✅ EXISTS' : '❌ MISSING');
+      
+      // Check globals.css content
+      if (fs.existsSync(globalsPath)) {
+        const globalsContent = fs.readFileSync(globalsPath, 'utf-8');
+        const hasTailwindDirectives = globalsContent.includes('@tailwind');
+        console.log('  @tailwind directives:', hasTailwindDirectives ? '✅ FOUND' : '❌ MISSING');
+      }
       
       console.log('='.repeat(80) + '\n');
     },

@@ -14,6 +14,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './'),
     },
   },
+  css: {
+    postcss: './postcss.config.js',
+  },
   server: {
     port: 5173,
     host: true,
@@ -22,6 +25,7 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: false,
     emptyOutDir: true,
+    cssCodeSplit: true,
     rollupOptions: {
       output: {
         manualChunks: {
