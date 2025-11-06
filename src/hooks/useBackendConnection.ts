@@ -3,7 +3,7 @@ import { wsClient, WSMessage } from '../services/websocketClient';
 import { apiClient } from '../services/apiClient';
 import type { Trade } from '../components/TradeCard';
 import { logger } from '../utils/logger';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface BackendConnectionState {
   isConnected: boolean;
