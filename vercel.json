@@ -1,6 +1,7 @@
 {
-  "framework": "vite",
-  "installCommand": "npm install",
-  "buildCommand": "npx vite@5.4.11 build",
-  "outputDirectory": "dist"
+  "version": 2,
+  "buildCommand": "corepack enable && corepack prepare pnpm@9.12.0 --activate && pnpm i --frozen-lockfile && pnpm --filter ./apps/frontend build",
+  "installCommand": "corepack enable && corepack prepare pnpm@9.12.0 --activate && pnpm i --frozen-lockfile",
+  "outputDirectory": "apps/frontend/build",
+  "framework": "vite"
 }
