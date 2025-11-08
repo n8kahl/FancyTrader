@@ -166,10 +166,51 @@ const backtestRunResponseSchema = z.object({
   buckets: z.array(weeklyBucketSchema),
 });
 
+const chartAnnotationSchema = z.object({
+  id: z.string(),
+  symbol: z.string(),
+  entry: z.number(),
+  stop: z.number().nullable().optional(),
+  targets: z.array(z.number()).optional(),
+  notes: z.string().nullable().optional(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
+const chartAnnotationListSchema = z.object({
+  annotations: z.array(chartAnnotationSchema),
+});
+
+const chartAnnotationResponseSchema = z.object({
+  annotation: chartAnnotationSchema,
+});
+
 export type AlertRule = z.infer<typeof alertSchema>;
 export type BacktestTradeResult = z.infer<typeof backtestTradeSchema>;
 export type WeeklyBucket = z.infer<typeof weeklyBucketSchema>;
 export type BacktestRunResult = z.infer<typeof backtestRunResponseSchema>;
+
+export interface ChartAnnotation {
+  id: string;
+  symbol: string;
+  entry: number;
+  stop: number | null;
+  targets: number[];
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChartAnnotationInput {
+  symbol: string;
+  entry: number;
+  stop?: number | null;
+  targets?: number[];
+  notes?: string | null;
+}
+
+export type ChartAnnotationDraft = Omit<ChartAnnotationInput, "symbol">;
+export type ChartAnnotationPatch = Partial<ChartAnnotationDraft> & { entry?: number };
 
 export interface BacktestRunPayload {
   symbol: string;
@@ -416,6 +457,57 @@ class ApiClient {
   }
 
   // ============================================
+  // CHART ANNOTATIONS
+  // ============================================
+
+  async listChartAnnotations(symbol: string, userId: string): Promise<ChartAnnotation[]> {
+    const url = new URL(API_ENDPOINTS.chartAnnotations());
+    if (symbol) {
+      url.searchParams.set("symbol", symbol);
+    }
+    const response = await this.fetch<unknown>(url.toString(), {
+      headers: this.userHeaders(userId),
+    });
+    const parsed = chartAnnotationListSchema.parse(response);
+    return parsed.annotations.map(normalizeAnnotation);
+  }
+
+  async createChartAnnotation(
+    userId: string,
+    payload: ChartAnnotationInput
+  ): Promise<ChartAnnotation> {
+    const response = await this.fetch<unknown>(API_ENDPOINTS.chartAnnotations(), {
+      method: "POST",
+      headers: this.userHeaders(userId),
+      body: JSON.stringify(payload),
+    });
+    const parsed = chartAnnotationResponseSchema.parse(response);
+    return normalizeAnnotation(parsed.annotation);
+  }
+
+  async updateChartAnnotation(
+    userId: string,
+    id: string,
+    patch: ChartAnnotationPatch
+  ): Promise<ChartAnnotation> {
+    const response = await this.fetch<unknown>(API_ENDPOINTS.chartAnnotation(id), {
+      method: "PUT",
+      headers: this.userHeaders(userId),
+      body: JSON.stringify(patch),
+    });
+    const parsed = chartAnnotationResponseSchema.parse(response);
+    return normalizeAnnotation(parsed.annotation);
+  }
+
+  async deleteChartAnnotation(userId: string, id: string): Promise<{ ok: true }> {
+    const response = await this.fetch<unknown>(API_ENDPOINTS.chartAnnotation(id), {
+      method: "DELETE",
+      headers: this.userHeaders(userId),
+    });
+    return okResponseSchema.parse(response);
+  }
+
+  // ============================================
   // WATCHLIST
   // ============================================
   // ============================================
@@ -593,6 +685,13 @@ class ApiClient {
     return statusMap[backendStatus] || "MONITORING";
   }
 
+  private userHeaders(userId?: string): Record<string, string> {
+    if (!userId) {
+      throw new ApiErrorEx("Missing userId for this request", "USER_ID_REQUIRED");
+    }
+    return { "x-user-id": userId };
+  }
+
   async shareTradeToDiscord(trade: Trade): Promise<{ id: string }> {
     const response = await this.fetch<unknown>(API_ENDPOINTS.shareTrade(), {
       method: "POST",
@@ -610,6 +709,20 @@ class ApiClient {
     const parsed = shareResponseSchema.parse(response);
     return { id: parsed.id };
   }
+}
+
+
+function normalizeAnnotation(record: z.infer<typeof chartAnnotationSchema>): ChartAnnotation {
+  return {
+    id: record.id,
+    symbol: record.symbol,
+    entry: record.entry,
+    stop: record.stop ?? null,
+    targets: record.targets ?? [],
+    notes: record.notes ?? null,
+    createdAt: record.created_at,
+    updatedAt: record.updated_at,
+  };
 }
 
 

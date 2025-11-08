@@ -7,6 +7,7 @@ import { setupBacktestRoutes } from "./backtest";
 import { setupAlertsRoutes } from "./alerts";
 import { setupShareRoutes } from "./share";
 import { setupTradesRoutes } from "./trades";
+import { setupChartAnnotationsRoutes } from "./chartAnnotations";
 import { SupabaseService } from "../services/supabaseService";
 import { StrategyDetectorService } from "../services/strategyDetector";
 import { PolygonStreamingService } from "../services/polygonStreamingService";
@@ -29,4 +30,5 @@ export function setupRoutes(app: Express, services: Services): void {
   setupAlertsRoutes(app, services.alertRegistry);
   setupShareRoutes(app);
   setupTradesRoutes(app);
+  setupChartAnnotationsRoutes(app);
 }

@@ -16,7 +16,8 @@ import {
   History,
 } from "lucide-react";
 import type { Trade } from "@/types/trade";
-import { CandlestickChart, type PatientCandleData, generateMockCandles } from "./CandlestickChart";
+import { type PatientCandleData, generateMockCandles } from "./CandlestickChart";
+import { SymbolChartWithAnnotations } from "./SymbolChartWithAnnotations";
 import { getContractDisplay } from "../types/options";
 import { getStrategyById } from "../config/strategies";
 import {
@@ -24,6 +25,7 @@ import {
   getStrengthColor,
   formatConfluenceValue,
 } from "../types/confluence";
+import { getDefaultUserId } from "../utils/user";
 
 interface TradeDetailsModalProps {
   trade: Trade | null;
@@ -145,6 +147,7 @@ export function TradeDetailsModal({ trade, isOpen, onClose, onSendAlert }: Trade
   };
 
   const strategyInstructions = getStrategyInstructions();
+  const annotationsUserId = getDefaultUserId();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -332,15 +335,17 @@ export function TradeDetailsModal({ trade, isOpen, onClose, onSendAlert }: Trade
                   </span>
                 )}
               </p>
-              <CandlestickChart
+              <SymbolChartWithAnnotations
+                symbol={trade.symbol}
+                userId={annotationsUserId}
                 candles={priceData}
-                entry={resolvedEntry ?? undefined}
-                target={resolvedTarget ?? undefined}
-                stop={resolvedStop ?? undefined}
                 currentPrice={price}
                 patientCandle={patientCandleData}
                 keyLevels={keyLevels}
                 height={320}
+                fallbackEntry={resolvedEntry ?? price}
+                fallbackStop={resolvedStop ?? null}
+                fallbackTargets={trade.targets ?? (resolvedTarget ? [resolvedTarget] : undefined)}
               />
             </div>
 

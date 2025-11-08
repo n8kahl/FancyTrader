@@ -56,6 +56,10 @@ export const API_ENDPOINTS = {
   shareTrade: () => `${BACKEND_CONFIG.httpUrl}/api/share/discord/trade`,
   shareBacktest: () => `${BACKEND_CONFIG.httpUrl}/api/share/discord/backtest`,
 
+  // Chart annotations
+  chartAnnotations: () => `${BACKEND_CONFIG.httpUrl}/api/chart/annotations`,
+  chartAnnotation: (id: string) => `${BACKEND_CONFIG.httpUrl}/api/chart/annotations/${id}`,
+
   // Backtest
   runBacktest: () => `${BACKEND_CONFIG.httpUrl}/api/backtest/run`,
   getBacktestCsv: () => `${BACKEND_CONFIG.httpUrl}/api/backtest/csv`,

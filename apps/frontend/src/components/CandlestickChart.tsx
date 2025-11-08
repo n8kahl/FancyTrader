@@ -1,3 +1,4 @@
+import React, { useRef, useState } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 
 export interface Candle {
@@ -20,22 +21,26 @@ interface CandlestickChartProps {
   candles: Candle[];
   entry?: number;
   target?: number;
-  stop?: number;
+  targets?: number[];
+  stop?: number | null;
   currentPrice?: number;
   patientCandle?: PatientCandleData;
   keyLevels?: { price: number; label: string }[];
   height?: number;
+  onAnnotationDragEnd?: (patch: { entry?: number; stop?: number | null; targets?: number[] }) => void;
 }
 
 export function CandlestickChart({
   candles,
   entry,
   target,
+  targets,
   stop,
   currentPrice,
   patientCandle,
   keyLevels = [],
   height = 300,
+  onAnnotationDragEnd,
 }: CandlestickChartProps) {
   if (candles.length === 0) {
     return (
@@ -47,9 +52,10 @@ export function CandlestickChart({
 
   // Calculate price range for scaling
   const allPrices = candles.flatMap((c) => [c.high, c.low]);
-  if (entry) allPrices.push(entry);
-  if (target) allPrices.push(target);
-  if (stop) allPrices.push(stop);
+  const resolvedTargets = targets ?? (typeof target === "number" ? [target] : []);
+  if (typeof entry === "number") allPrices.push(entry);
+  resolvedTargets.forEach((value) => allPrices.push(value));
+  if (typeof stop === "number") allPrices.push(stop);
   if (currentPrice) allPrices.push(currentPrice);
   keyLevels.forEach((level) => allPrices.push(level.price));
 
@@ -57,10 +63,74 @@ export function CandlestickChart({
   const minPrice = Math.min(...allPrices);
   const priceRange = maxPrice - minPrice;
   const padding = priceRange * 0.1;
+  const priceSpan = priceRange + 2 * padding || 1;
 
   // Convert price to Y coordinate (0-100)
-  const priceToY = (price: number) => {
-    return ((maxPrice + padding - price) / (priceRange + 2 * padding)) * 100;
+  const priceToY = (price: number) => ((maxPrice + padding - price) / priceSpan) * 100;
+  const yToPrice = (position: number) => maxPrice + padding - ((position / 100) * priceSpan);
+
+  type DragHandle =
+    | { kind: "entry" }
+    | { kind: "stop" }
+    | { kind: "target"; index: number };
+
+  const [dragHandle, setDragHandle] = useState<DragHandle | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const pointerToPrice = (clientY: number): number | null => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    if (!rect.height) return null;
+    const yPx = clientY - rect.top;
+    const yPct = Math.max(0, Math.min(100, (yPx / rect.height) * 100));
+    const price = Number(yToPrice(yPct).toFixed(2));
+    return Number.isFinite(price) ? price : null;
+  };
+
+  const startDrag = (handle: DragHandle) => (event: React.PointerEvent<SVGElement>) => {
+    if (!onAnnotationDragEnd) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    setDragHandle(handle);
+    svgRef.current?.setPointerCapture?.(event.pointerId);
+  };
+
+  const emitDrag = (handle: DragHandle, price: number) => {
+    if (!onAnnotationDragEnd) {
+      return;
+    }
+    if (handle.kind === "entry") {
+      onAnnotationDragEnd({ entry: price });
+      return;
+    }
+    if (handle.kind === "stop") {
+      onAnnotationDragEnd({ stop: price });
+      return;
+    }
+    const updatedTargets = [...resolvedTargets];
+    updatedTargets[handle.index] = price;
+    onAnnotationDragEnd({ targets: updatedTargets });
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<SVGSVGElement>) => {
+    if (!dragHandle) {
+      return;
+    }
+    const target = dragHandle;
+    setDragHandle(null);
+    svgRef.current?.releasePointerCapture?.(event.pointerId);
+    const price = pointerToPrice(event.clientY);
+    if (price == null) {
+      return;
+    }
+    emitDrag(target, price);
+  };
+
+  const handlePointerCancel = () => {
+    setDragHandle(null);
   };
 
   // Calculate candle width and spacing
@@ -80,10 +150,18 @@ export function CandlestickChart({
 
       {/* SVG Chart */}
       <svg
+        ref={svgRef}
         className="w-full"
         style={{ height: `${height}px` }}
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
+        onPointerLeave={(event) => {
+          if (event.buttons === 0) {
+            handlePointerCancel();
+          }
+        }}
       >
         {/* Background grid */}
         <line
@@ -118,32 +196,49 @@ export function CandlestickChart({
         />
 
         {/* Reference levels */}
-        {target && (
-          <g>
-            <line
-              x1="0"
-              y1={priceToY(target)}
-              x2="100"
-              y2={priceToY(target)}
-              stroke="#3b82f6"
-              strokeWidth="0.3"
-              strokeDasharray="2,1"
-            />
-            <text
-              x="98"
-              y={priceToY(target) - 0.5}
-              fontSize="2.5"
-              fill="#3b82f6"
-              textAnchor="end"
-              className="font-mono"
-            >
-              Target ${target.toFixed(2)}
-            </text>
-          </g>
+        {resolvedTargets.length > 0 && (
+          <>
+            {resolvedTargets.map((value, index) => (
+              <g
+                key={`target-${index}`}
+                style={{ cursor: onAnnotationDragEnd ? "ns-resize" : "default" }}
+              >
+                <line
+                  x1="0"
+                  y1={priceToY(value)}
+                  x2="100"
+                  y2={priceToY(value)}
+                  stroke="#3b82f6"
+                  strokeWidth="0.3"
+                  strokeDasharray="2,1"
+                  onPointerDown={startDrag({ kind: "target", index })}
+                />
+                <text
+                  x="98"
+                  y={priceToY(value) - 0.5}
+                  fontSize="2.5"
+                  fill="#3b82f6"
+                  textAnchor="end"
+                  className="font-mono select-none"
+                >
+                  Target {index + 1} ${value.toFixed(2)}
+                </text>
+                <line
+                  x1="0"
+                  y1={priceToY(value)}
+                  x2="100"
+                  y2={priceToY(value)}
+                  stroke="transparent"
+                  strokeWidth="3"
+                  onPointerDown={startDrag({ kind: "target", index })}
+                />
+              </g>
+            ))}
+          </>
         )}
 
-        {entry && (
-          <g>
+        {typeof entry === "number" && (
+          <g style={{ cursor: onAnnotationDragEnd ? "ns-resize" : "default" }}>
             <line
               x1="0"
               y1={priceToY(entry)}
@@ -152,6 +247,7 @@ export function CandlestickChart({
               stroke="#10b981"
               strokeWidth="0.4"
               strokeDasharray="2,1"
+              onPointerDown={startDrag({ kind: "entry" })}
             />
             <text
               x="98"
@@ -159,15 +255,24 @@ export function CandlestickChart({
               fontSize="2.5"
               fill="#10b981"
               textAnchor="end"
-              className="font-mono"
+              className="font-mono select-none"
             >
               Entry ${entry.toFixed(2)}
             </text>
+            <line
+              x1="0"
+              y1={priceToY(entry)}
+              x2="100"
+              y2={priceToY(entry)}
+              stroke="transparent"
+              strokeWidth="3"
+              onPointerDown={startDrag({ kind: "entry" })}
+            />
           </g>
         )}
 
-        {stop && (
-          <g>
+        {typeof stop === "number" && (
+          <g style={{ cursor: onAnnotationDragEnd ? "ns-resize" : "default" }}>
             <line
               x1="0"
               y1={priceToY(stop)}
@@ -176,6 +281,7 @@ export function CandlestickChart({
               stroke="#ef4444"
               strokeWidth="0.3"
               strokeDasharray="2,1"
+              onPointerDown={startDrag({ kind: "stop" })}
             />
             <text
               x="98"
@@ -183,10 +289,19 @@ export function CandlestickChart({
               fontSize="2.5"
               fill="#ef4444"
               textAnchor="end"
-              className="font-mono"
+              className="font-mono select-none"
             >
               Stop ${stop.toFixed(2)}
             </text>
+            <line
+              x1="0"
+              y1={priceToY(stop)}
+              x2="100"
+              y2={priceToY(stop)}
+              stroke="transparent"
+              strokeWidth="3"
+              onPointerDown={startDrag({ kind: "stop" })}
+            />
           </g>
         )}
 
