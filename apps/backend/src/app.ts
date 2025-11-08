@@ -13,6 +13,7 @@ import { PolygonStreamingService } from "./services/polygonStreamingService";
 import { AlertRegistry } from "./alerts/registry";
 import { defaultStrategyParams } from "./config/strategy.defaults";
 import { errorHandler } from "./middleware/error";
+import { alertLimiter, shareLimiter } from "./middleware/rateLimit";
 
 const defaultAllowedOrigins = ["https://fancy-trader.vercel.app", "http://localhost:5173"];
 const corsAllowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
@@ -165,6 +166,8 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
 
   app.use(healthRouter);
   app.use("/api", healthRouter);
+  app.use("/api/alerts", alertLimiter);
+  app.use("/api/share", shareLimiter);
   setupRoutes(app, services);
 
   app.use(errorHandler);
