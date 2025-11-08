@@ -718,17 +718,6 @@ export function TradeDetailsModal({ trade, isOpen, onClose, onSendAlert }: Trade
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-2">
-              <Button
-                className="w-full bg-indigo-600 hover:bg-indigo-700"
-                onClick={() => {
-                  onSendAlert(trade);
-                  onClose();
-                }}
-                disabled={trade.status === "INVALID"}
-              >
-                <Send className="w-4 h-4 mr-2" />
-                Send Discord Alert
-              </Button>
               <DiscordShareButton kind="trade" payload={trade} />
             </div>
           </div>

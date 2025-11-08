@@ -327,8 +327,15 @@ export default function App({ backendDeps }: AppProps = {}) {
     setAlertTrade(trade);
   };
 
-  const handleAlertSent = (payload: { channel: string; content: string }) => {
+  const handleAlertSent = async (payload: { channel: string; content: string }) => {
     if (!alertTrade) return;
+
+    try {
+      await apiClient.shareTradeToDiscord(alertTrade);
+    } catch (error) {
+      logger.error("Failed to send Discord alert", error);
+      toast.error("Failed to send Discord alert: backend error");
+    }
 
     const alert: TradeAlert = {
       id: `alert-${Date.now()}`,
@@ -394,12 +401,19 @@ export default function App({ backendDeps }: AppProps = {}) {
     setTradeProgressTrade(updatedTrade);
   };
 
-  const handleSendProgressAlert = (
+  const handleSendProgressAlert = async (
     type: AlertType,
     message: string,
     data?: ProgressAlertPayload
   ) => {
     if (!tradeProgressTrade) return;
+
+    try {
+      await apiClient.shareTradeToDiscord(tradeProgressTrade);
+    } catch (error) {
+      logger.error("Failed to send Discord alert", error);
+      toast.error("Failed to send Discord alert: backend error");
+    }
 
     const alert: TradeAlert = {
       id: `alert-${Date.now()}`,
