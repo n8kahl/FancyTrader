@@ -4,6 +4,7 @@ import type { Snapshot, TradeLite, WatchlistItem, AlertCondition } from "@fancyt
 import type { StrategyParams } from "@fancytrader/shared";
 import { API_ENDPOINTS } from "../config/backend";
 import { logger } from "../utils/logger";
+import { getUserId } from "../lib/user";
 import type { Trade } from "@/types/trade";
 import type { OptionsContract } from "@/types/options";
 
@@ -225,17 +226,24 @@ export interface BacktestRunPayload {
  * API Client for backend communication
  */
 class ApiClient {
+  private async request(url: string, options?: RequestInit): Promise<Response> {
+    const headers = new Headers(options?.headers ?? {});
+    if (!headers.has("Content-Type") && options?.body) {
+      headers.set("Content-Type", "application/json");
+    }
+    headers.set("x-user-id", getUserId());
+
+    return fetch(url, {
+      ...options,
+      headers,
+    });
+  }
+
   private async fetch<T>(url: string, options?: RequestInit): Promise<T> {
     try {
       logger.info(`🌐 API Request: ${options?.method || "GET"} ${url}`);
 
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          ...options?.headers,
-        },
-      });
+      const response = await this.request(url, options);
 
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: ApiError } | null;
@@ -535,7 +543,7 @@ class ApiClient {
       url.searchParams.set("strategyParams", JSON.stringify(payload.strategyParams));
     }
 
-    const response = await fetch(url.toString());
+    const response = await this.request(url.toString());
     if (!response.ok) {
       throw new ApiErrorEx(`Failed to download backtest CSV (${response.status})`, "BACKTEST_CSV_ERROR");
     }

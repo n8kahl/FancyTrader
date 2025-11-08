@@ -13,6 +13,8 @@ import {
 } from "../validation/schemas";
 import type { WatchlistInput } from "../validation/schemas";
 
+const DEMO_USER_ID = process.env.DEMO_USER_ID?.trim();
+
 interface Services {
   supabaseService: SupabaseService;
   strategyDetector: StrategyDetectorService;
@@ -46,6 +48,10 @@ const resolveUserId = (req: Request): string | undefined => {
     if (firstMatch) {
       return firstMatch.trim();
     }
+  }
+
+  if (isNonEmptyString(DEMO_USER_ID)) {
+    return DEMO_USER_ID;
   }
 
   return undefined;

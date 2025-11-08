@@ -25,7 +25,7 @@ import {
   getStrengthColor,
   formatConfluenceValue,
 } from "../types/confluence";
-import { getDefaultUserId } from "../utils/user";
+import { getUserId } from "../lib/user";
 
 interface TradeDetailsModalProps {
   trade: Trade | null;
@@ -147,7 +147,7 @@ export function TradeDetailsModal({ trade, isOpen, onClose, onSendAlert }: Trade
   };
 
   const strategyInstructions = getStrategyInstructions();
-  const annotationsUserId = getDefaultUserId();
+    const annotationsUserId = getUserId();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
