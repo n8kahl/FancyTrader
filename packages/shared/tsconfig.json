@@ -2,12 +2,13 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src",
     "declaration": true,
-    "declarationMap": true,
-    "composite": true,
     "emitDeclarationOnly": false,
-    "skipLibCheck": true
+    "sourceMap": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2019",
+    "jsx": "react-jsx"
   },
   "include": ["src"]
 }
