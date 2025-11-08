@@ -1,4 +1,4 @@
-import { Express } from "express";
+import { Express, Request, Router } from "express";
 import type { SupabaseService } from "../services/supabaseService";
 import type { StrategyDetectorService } from "../services/strategyDetector";
 import type { PolygonStreamingService } from "../services/polygonStreamingService";
@@ -7,6 +7,7 @@ import { asyncHandler } from "../utils/asyncHandler";
 import {
   userIdParamSchema,
   watchlistBodySchema,
+  watchlistAddSchema,
   watchlistBulkSchema,
   watchlistSymbolParamSchema,
 } from "../validation/schemas";
@@ -26,8 +27,98 @@ const normalizeSymbol = (input: WatchlistInput | WatchlistSymbol): WatchlistSymb
   addedAt: input.addedAt ?? Date.now(),
 });
 
+const resolveUserId = (req: Request): string | undefined => {
+  const headerUserId = req.header("x-user-id")?.trim();
+  if (headerUserId) {
+    return headerUserId;
+  }
+
+  const queryUserId = req.query.userId;
+  if (typeof queryUserId === "string" && queryUserId.trim()) {
+    return queryUserId.trim();
+  }
+  if (Array.isArray(queryUserId)) {
+    const first = queryUserId.find((value) => typeof value === "string" && value.trim());
+    if (first) {
+      return first.trim();
+    }
+  }
+
+  return undefined;
+};
+
 export function setupWatchlistRoutes(app: Express, services: Services): void {
   const { supabaseService } = services;
+  const compatibilityRouter = Router();
+
+  /**
+   * GET /api/watchlist - Compatibility route that uses headers/query for userId
+   */
+  compatibilityRouter.get(
+    "/",
+    asyncHandler(async (req, res) => {
+      const userId = resolveUserId(req);
+      if (!userId) {
+        res.status(400).json({ error: "Missing userId" });
+        return;
+      }
+
+      const watchlist = await supabaseService.getWatchlist(userId);
+      res.json(watchlist);
+    })
+  );
+
+  /**
+   * POST /api/watchlist - Compatibility route that accepts single symbol payloads
+   */
+  compatibilityRouter.post(
+    "/",
+    asyncHandler(async (req, res) => {
+      const userId = resolveUserId(req);
+      if (!userId) {
+        res.status(400).json({ error: "Missing userId" });
+        return;
+      }
+
+      const symbolInput = watchlistAddSchema.parse(req.body);
+      const newEntry = normalizeSymbol(symbolInput);
+      const currentWatchlist = await supabaseService.getWatchlist(userId);
+      const exists = currentWatchlist.some((symbol) => symbol.symbol === newEntry.symbol);
+
+      if (!exists) {
+        const updatedWatchlist = [...currentWatchlist, newEntry];
+        await supabaseService.saveWatchlist(userId, updatedWatchlist);
+        res.json({ ok: true, watchlist: updatedWatchlist });
+        return;
+      }
+
+      res.json({ ok: true, watchlist: currentWatchlist });
+    })
+  );
+
+  /**
+   * DELETE /api/watchlist/:symbol - Compatibility route that uses headers/query for userId
+   */
+  compatibilityRouter.delete(
+    "/:symbol",
+    asyncHandler(async (req, res) => {
+      const userId = resolveUserId(req);
+      if (!userId) {
+        res.status(400).json({ error: "Missing userId" });
+        return;
+      }
+
+      const { symbol } = watchlistSymbolParamSchema.parse(req.params);
+      const normalizedSymbol = symbol.toUpperCase();
+      const currentWatchlist = await supabaseService.getWatchlist(userId);
+      const updatedWatchlist = currentWatchlist.filter((entry) => entry.symbol !== normalizedSymbol);
+
+      await supabaseService.saveWatchlist(userId, updatedWatchlist);
+      res.json({ ok: true, removed: normalizedSymbol, watchlist: updatedWatchlist });
+    })
+  );
+
+  app.use("/api/watchlist", compatibilityRouter);
 
   /**
    * GET /api/watchlist/:userId - Get user's watchlist
