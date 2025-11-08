@@ -77,7 +77,7 @@ export function useBackendConnection(
   /**
    * Handle setup updates
    */
-  const handleSetupUpdate = (payload: {
+  const handleSetupUpdate = useCallback((payload: {
     action?: string;
     setup?: BackendSetup;
     setups?: BackendSetup[];
@@ -159,12 +159,12 @@ export function useBackendConnection(
         lastUpdate: Date.now(),
       };
     });
-  };
+  }, [toast]);
 
   /**
    * Handle price updates
    */
-  const handlePriceUpdate = (payload: { symbol: string; price: number }) => {
+  const handlePriceUpdate = useCallback((payload: { symbol: string; price: number }) => {
     const { symbol, price } = payload;
 
     setState((prev) => {
@@ -189,7 +189,7 @@ export function useBackendConnection(
         lastUpdate: Date.now(),
       };
     });
-  };
+  }, []);
 
   /**
    * Handle WebSocket messages
