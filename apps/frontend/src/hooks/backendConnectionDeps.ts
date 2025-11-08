@@ -7,6 +7,7 @@ type WsClientContract = {
   connect(): void;
   close(): void;
   disconnect(): void;
+  manualReconnect?: () => void;
   subscribe(symbols: string[]): void;
   unsubscribe(symbols: string[]): void;
   resubscribeAll(): void;

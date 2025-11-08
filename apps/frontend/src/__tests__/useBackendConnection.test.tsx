@@ -53,6 +53,7 @@ function createHarness(initialState: ConnectionState = "DISCONNECTED") {
     connect: vi.fn(),
     close: vi.fn(),
     disconnect: vi.fn(),
+    manualReconnect: vi.fn(),
     subscribe: vi.fn(),
     unsubscribe: vi.fn(),
     resubscribeAll: vi.fn(),
@@ -355,6 +356,22 @@ describeHook("useBackendConnection", () => {
 
     expect(result.current.trades[0].currentPrice).toBe(200);
     expect(result.current.trades[0].profitLoss).toBeUndefined();
+  });
+
+  it("exposes manual reconnect and banner state", async () => {
+    const harness = createHarness();
+    const { result } = renderHook(() => useBackendConnection(true, harness.deps));
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => harness.emitWsMessage({ type: "SERVICE_STATE", payload: { status: "degraded", reason: "max" } }));
+    expect(result.current.connectionStatus).toBe("degraded");
+    expect(result.current.connectionReason).toBe("max");
+
+    act(() => {
+      result.current.manualReconnect();
+    });
+    expect(harness.wsClient.manualReconnect).toHaveBeenCalled();
   });
 
   it("respects the autoConnect flag", () => {

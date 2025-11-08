@@ -143,6 +143,23 @@ export class WebSocketClient {
     return Array.from(this.subscribedSymbols);
   }
 
+  manualReconnect(): void {
+    logger.info("Manual WebSocket reconnect triggered");
+    this.clearReconnectTimer();
+    this.clearHeartbeatTimer();
+    if (this.ws) {
+      try {
+        this.ws.onclose = null;
+        this.ws.onerror = null;
+        this.ws.close();
+      } catch (error) {
+        logger.error("Failed to close WebSocket before reconnect", { error });
+      }
+      this.ws = null;
+    }
+    this.openSocket(true);
+  }
+
   private openSocket(isReconnect: boolean): void {
     this.clearReconnectTimer();
     this.setState(isReconnect ? "RECONNECTING" : "CONNECTING");

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import type { WSMessage, ConnectionState } from "../services/websocketClient";
 import type { BackendSetup } from "../services/apiClient";
 import type { Trade } from "@/types/trade";
@@ -15,6 +15,14 @@ interface BackendConnectionState {
   connectionState: ConnectionState;
   serviceState?: ServiceState;
 }
+
+export type ConnectionBannerState =
+  | "connecting"
+  | "healthy"
+  | "degraded"
+  | "offline"
+  | "error"
+  | "closed";
 
 export function useBackendConnection(
   autoConnect = true,
@@ -321,11 +329,28 @@ export function useBackendConnection(
     };
   }, [autoConnect, handleMessage, fetchSetups, apiClient, wsClient, toast]);
 
+  const manualReconnectHandler = useCallback(() => {
+    if (typeof wsClient.manualReconnect === "function") {
+      wsClient.manualReconnect();
+    } else {
+      wsClient.close();
+      wsClient.connect();
+    }
+  }, [wsClient]);
+
+  const connectionMeta = useMemo(
+    () => deriveConnectionStatus(state.connectionState, state.serviceState, state.error),
+    [state.connectionState, state.serviceState, state.error]
+  );
+
   return {
     ...state,
     subscribeToSymbols,
     unsubscribeFromSymbols,
     refreshSetups: fetchSetups,
+    connectionStatus: connectionMeta.state,
+    connectionReason: connectionMeta.reason,
+    manualReconnect: manualReconnectHandler,
   };
 }
 
@@ -408,4 +433,45 @@ function resolveTradeStatus(status?: string | null): Trade['status'] {
 
 function formatSetupName(setupType?: string): string {
   return setupType ? setupType.replace(/_/g, ' ') : 'Unknown setup';
+}
+
+function deriveConnectionStatus(
+  connectionState: ConnectionState,
+  serviceState?: ServiceState,
+  error?: string | null
+): { state: ConnectionBannerState; reason: string | null } {
+  let derived: ConnectionBannerState = "connecting";
+  let reason: string | null = null;
+
+  switch (connectionState) {
+    case "CONNECTED":
+      derived = "healthy";
+      break;
+    case "DISCONNECTED":
+      derived = "closed";
+      break;
+    case "RECONNECTING":
+      derived = "connecting";
+      reason = "Reconnecting…";
+      break;
+    case "CONNECTING":
+    default:
+      derived = "connecting";
+      break;
+  }
+
+  if (serviceState?.status === "degraded") {
+    derived = "degraded";
+    reason = serviceState.reason ?? reason;
+  } else if (serviceState?.status === "offline") {
+    derived = "offline";
+    reason = serviceState.reason ?? reason;
+  }
+
+  if (error && derived !== "healthy") {
+    derived = "error";
+    reason = error;
+  }
+
+  return { state: derived, reason };
 }
