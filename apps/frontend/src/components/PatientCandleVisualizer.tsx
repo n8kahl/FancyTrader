@@ -40,10 +40,6 @@ export function PatientCandleVisualizer({
   stop,
   compact = false,
 }: PatientCandleVisualizerProps) {
-  if (!DIAGNOSTICS_ENABLED) {
-    return null;
-  }
-
   // Check containment based on direction
   const isContained =
     direction === "LONG"
