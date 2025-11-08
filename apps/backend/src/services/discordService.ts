@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
+import axios, { AxiosError } from "axios";
 import type { Trade as SharedTrade } from "@fancytrader/shared/cjs";
 import { DiscordAlert, DetectedSetup, OptionsContract } from "../types";
 import { logger } from "../utils/logger";
 import { HttpError } from "../utils/httpError";
+import { redactSecrets } from "../utils/redact";
 
 export interface DiscordField {
   name: string;
@@ -30,46 +32,122 @@ export interface BacktestShareSummary {
   strategy?: string;
 }
 
-export interface BacktestShareOptions {
-  link?: string;
-  note?: string;
+interface DiscordSendOptions {
   webhook?: string;
+  idempotencyKey?: string;
 }
 
-// TODO: mask PII / redact tokens before GA
-export async function sendEmbed(embed: DiscordEmbed, webhook?: string): Promise<{ id: string }> {
-  const envWebhook = process.env.DISCORD_WEBHOOK_URL;
-  const url: string | undefined = webhook ?? envWebhook;
+export interface BacktestShareOptions extends DiscordSendOptions {
+  link?: string;
+  note?: string;
+}
+
+interface DiscordPayload {
+  embeds: DiscordEmbed[];
+}
+
+const parseBoolean = (value: string | undefined, fallback: boolean): boolean => {
+  if (value === undefined) {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["false", "0", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  return fallback;
+};
+
+const parsePositiveNumber = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return fallback;
+};
+
+const getTimeoutMs = (): number => parsePositiveNumber(process.env.DISCORD_TIMEOUT_MS, 4000);
+const getMaxRetries = (): number => {
+  const parsed = Number(process.env.DISCORD_MAX_RETRIES ?? 3);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 3;
+  }
+  return Math.floor(parsed);
+};
+const getRetryBaseMs = (): number => parsePositiveNumber(process.env.DISCORD_RETRY_BASE_MS, 300);
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+const shouldRetry = (error: AxiosError): boolean => {
+  if (error.code === "ECONNABORTED") {
+    return true;
+  }
+  const status = error.response?.status;
+  if (!status) {
+    return true;
+  }
+  return status >= 500 || status === 429;
+};
+
+async function postWithRetry(payload: DiscordPayload, options: DiscordSendOptions = {}): Promise<void> {
+  const url = (options.webhook ?? process.env.DISCORD_WEBHOOK_URL ?? "").trim();
   if (!url) {
     throw new HttpError(400, "Missing Discord webhook URL", "DISCORD_WEBHOOK_MISSING");
   }
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ embeds: [embed] }),
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
 
-  if (response.status === 429) {
-    const retryAfterHeader = response.headers.get("retry-after") ?? "0";
-    throw new HttpError(
-      429,
-      `Discord rate-limited. retry-after=${retryAfterHeader}s`,
-      "DISCORD_RATE_LIMITED",
-      { retryAfter: Number(retryAfterHeader) }
-    );
+  if (options.idempotencyKey) {
+    headers["Idempotency-Key"] = options.idempotencyKey;
   }
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => "");
-    throw new HttpError(
-      response.status,
-      `Discord webhook error: ${response.status} ${response.statusText}`,
-      "DISCORD_WEBHOOK_ERROR",
-      { body: body.slice(0, 500) }
-    );
-  }
+  const timeout = getTimeoutMs();
+  const maxRetries = getMaxRetries();
+  const baseDelay = getRetryBaseMs();
+  const safeUrl = redactSecrets(url);
 
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      await axios.post(url, payload, { timeout, headers });
+      return;
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      const status = axiosError.response?.status;
+      const safeMessage = redactSecrets(axiosError.message ?? "unknown error");
+      const retry = shouldRetry(axiosError);
+
+      if (!retry || attempt === maxRetries) {
+        logger.error("Discord request failed", {
+          attempt: attempt + 1,
+          status,
+          url: safeUrl,
+          error: safeMessage,
+        });
+        throw new HttpError(502, "Discord send failed after " + (attempt + 1) + " attempts", "DISCORD_SEND_FAILED", {
+          status,
+          attempt: attempt + 1,
+        });
+      }
+
+      const delay = Math.floor(baseDelay * 2 ** attempt + Math.random() * 100);
+      logger.warn("Discord request failed, retrying", {
+        attempt: attempt + 1,
+        status,
+        delayMs: delay,
+        url: safeUrl,
+        error: safeMessage,
+      });
+      await sleep(delay);
+    }
+  }
+}
+
+export async function sendEmbed(embed: DiscordEmbed, webhook?: string, options?: DiscordSendOptions): Promise<{ id: string }> {
+  await postWithRetry({ embeds: [embed] }, { webhook, idempotencyKey: options?.idempotencyKey });
   return { id: randomUUID() };
 }
 
@@ -78,22 +156,36 @@ export class DiscordService {
   private enabled: boolean;
 
   constructor() {
-    this.webhookUrl = process.env.DISCORD_WEBHOOK_URL || "";
-    this.enabled = process.env.DISCORD_ENABLED === "true";
+    this.webhookUrl = (process.env.DISCORD_WEBHOOK_URL || "").trim();
+    this.enabled = parseBoolean(process.env.DISCORD_ENABLED, true);
 
     if (!this.webhookUrl && this.enabled) {
       logger.warn("Discord webhook URL not configured. Alerts will be logged only.");
     }
   }
 
-  async sendTradeShare(trade: SharedTrade, webhook?: string): Promise<{ id: string }> {
+  async sendTradeShare(trade: SharedTrade, options?: DiscordSendOptions): Promise<{ id: string }> {
+    if (!this.enabled) {
+      logger.debug("Discord trade share disabled; skipping send.");
+      return { id: randomUUID() };
+    }
+
     const embed = this.buildTradeShareEmbed(trade);
-    return sendEmbed(embed, webhook ?? this.webhookUrl);
+    return sendEmbed(embed, options?.webhook ?? this.webhookUrl, {
+      idempotencyKey: options?.idempotencyKey,
+    });
   }
 
   async sendBacktestShare(summary: BacktestShareSummary, options?: BacktestShareOptions): Promise<{ id: string }> {
+    if (!this.enabled) {
+      logger.debug("Discord backtest share disabled; skipping send.");
+      return { id: randomUUID() };
+    }
+
     const embed = this.buildBacktestShareEmbed(summary, options);
-    return sendEmbed(embed, options?.webhook ?? this.webhookUrl);
+    return sendEmbed(embed, options?.webhook ?? this.webhookUrl, {
+      idempotencyKey: options?.idempotencyKey,
+    });
   }
 
   /**

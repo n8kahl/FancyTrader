@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { tradeSchema } from "@fancytrader/shared/cjs";
 import { DiscordService } from "../services/discordService";
+import { idempotencyMiddleware } from "../middleware/idempotency";
 
 const tradeShareSchema = z.object({ trade: tradeSchema });
 
@@ -28,16 +29,14 @@ export function setupShareRoutes(app: Express): void {
 
   router.post(
     "/discord/trade",
+    idempotencyMiddleware,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const webhook = process.env.DISCORD_WEBHOOK_URL;
-        if (!webhook) {
-          res.status(400).json({ ok: false, error: "Discord webhook not configured" });
-          return;
-        }
-
         const parsed = tradeShareSchema.parse(req.body);
-        const result = await discord.sendTradeShare(parsed.trade, webhook);
+        const result = await discord.sendTradeShare(parsed.trade, {
+          webhook: process.env.DISCORD_WEBHOOK_URL,
+          idempotencyKey: req.header("x-idempotency-key") ?? undefined,
+        });
         res.json({ ok: true, id: result.id });
       } catch (error) {
         next(error);
@@ -47,19 +46,15 @@ export function setupShareRoutes(app: Express): void {
 
   router.post(
     "/discord/backtest",
+    idempotencyMiddleware,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const webhook = process.env.DISCORD_WEBHOOK_URL;
-        if (!webhook) {
-          res.status(400).json({ ok: false, error: "Discord webhook not configured" });
-          return;
-        }
-
         const parsed = backtestShareSchema.parse(req.body);
         const result = await discord.sendBacktestShare(parsed.summary, {
           link: parsed.link,
           note: parsed.note,
-          webhook,
+          webhook: process.env.DISCORD_WEBHOOK_URL,
+          idempotencyKey: req.header("x-idempotency-key") ?? undefined,
         });
         res.json({ ok: true, id: result.id });
       } catch (error) {
