@@ -1,13 +1,26 @@
 {
+  "$schema": "https://railway.app/railpack/plan.schema.json",
   "phases": {
     "install": {
-      "cmd": "corepack enable && corepack prepare pnpm@9.12.0 --activate && pnpm install"
+      "steps": [
+        {
+          "cmd": "corepack enable && corepack prepare pnpm@9.12.0 --activate && pnpm install"
+        }
+      ]
     },
     "build": {
-      "cmd": "pnpm --filter @fancytrader/backend build"
+      "steps": [
+        {
+          "cmd": "pnpm --filter @fancytrader/backend build"
+        }
+      ]
     },
     "start": {
-      "cmd": "node apps/backend/dist/index.js"
+      "steps": [
+        {
+          "cmd": "node apps/backend/dist/index.js"
+        }
+      ]
     }
   }
 }
