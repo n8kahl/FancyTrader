@@ -17,7 +17,16 @@ import { alertLimiter, shareLimiter } from "./middleware/rateLimit";
 
 const defaultAllowedOrigins = ["https://fancy-trader.vercel.app", "http://localhost:5173"];
 const corsAllowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
-const corsAllowedHeaders = ["Content-Type", "Authorization", "X-Requested-With"];
+const corsAllowedHeaders = [
+  "Content-Type",
+  "Authorization",
+  "X-Requested-With",
+  "X-User-Id",
+  "X-Admin-Key",
+  "X-Idempotency-Key",
+  "Idempotency-Key",
+  "X-Request-Id",
+];
 const corsExposedHeaders = [
   "Access-Control-Allow-Origin",
   "Access-Control-Allow-Methods",
@@ -47,11 +56,24 @@ function computeAllowedOrigins(): string[] {
   return Array.from(new Set([...envAllowedOrigins, ...defaultAllowedOrigins]));
 }
 
-function resolveAllowedOrigin(
-  origin: string | undefined | null,
-  allowedOrigins: string[]
-): string {
-  if (origin && (allowedOrigins.includes(origin) || previewRegex.test(origin))) {
+function isPreviewOrigin(origin: string): boolean {
+  try {
+    const parsed = new URL(origin);
+    return parsed.hostname.endsWith(".vercel.app");
+  } catch {
+    return previewRegex.test(origin);
+  }
+}
+
+function isOriginAllowed(origin: string | undefined | null, allowedOrigins: string[]): boolean {
+  if (!origin) {
+    return true;
+  }
+  return allowedOrigins.includes(origin) || isPreviewOrigin(origin);
+}
+
+function resolveAllowedOrigin(origin: string | undefined | null, allowedOrigins: string[]): string {
+  if (origin && isOriginAllowed(origin, allowedOrigins)) {
     return origin;
   }
   return allowedOrigins[0];
@@ -109,44 +131,35 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   app.use(helmet());
   app.use(compression());
 
-  app.use(
-    cors({
-      origin(origin, callback) {
-        if (!origin) {
-          callback(null, resolveAllowedOrigin(null, allowedOrigins));
-          return;
-        }
+  const corsOptions: cors.CorsOptions = {
+    origin(origin, callback) {
+      if (isOriginAllowed(origin, allowedOrigins)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS not allowed for this origin: ${origin ?? "<unknown>"}`));
+    },
+    credentials: true,
+    methods: corsAllowedMethods,
+    allowedHeaders: corsAllowedHeaders,
+    exposedHeaders: corsExposedHeaders,
+    optionsSuccessStatus: 204,
+  };
 
-        if (allowedOrigins.includes(origin) || previewRegex.test(origin)) {
-          callback(null, origin);
-          return;
-        }
-
-        callback(new Error(`CORS not allowed for this origin: ${origin}`));
-      },
-      credentials: true,
-      methods: corsAllowedMethods,
-      allowedHeaders: corsAllowedHeaders,
-      exposedHeaders: corsExposedHeaders,
-      optionsSuccessStatus: 204,
-    })
-  );
-
-  app.options("*", (req, res) => {
-    attachCorsHeaders(res, req.headers.origin, allowedOrigins);
-    res.sendStatus(204);
-  });
+  app.use(cors(corsOptions));
+  app.options("*", cors(corsOptions));
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (!origin || allowedOrigins.includes(origin) || previewRegex.test(origin)) {
+    if (!origin || isOriginAllowed(origin, allowedOrigins)) {
       attachCorsHeaders(res, origin, allowedOrigins);
     }
     next();
   });
 
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  const bodyLimit = process.env.REQUEST_BODY_LIMIT || "1mb";
+  app.use(express.json({ limit: bodyLimit }));
+  app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 
   app.use((req, _res, next) => {
     logger.info(`${req.method} ${req.path}`);

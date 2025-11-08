@@ -231,7 +231,19 @@ class ApiClient {
     if (!headers.has("Content-Type") && options?.body) {
       headers.set("Content-Type", "application/json");
     }
-    headers.set("x-user-id", getUserId());
+
+    const shouldAttachUserId = (() => {
+      try {
+        const parsed = new URL(url);
+        return parsed.pathname.startsWith("/api/");
+      } catch {
+        return url.startsWith("/api/");
+      }
+    })();
+
+    if (shouldAttachUserId) {
+      headers.set("x-user-id", getUserId());
+    }
 
     return fetch(url, {
       ...options,
