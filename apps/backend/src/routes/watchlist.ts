@@ -27,20 +27,24 @@ const normalizeSymbol = (input: WatchlistInput | WatchlistSymbol): WatchlistSymb
   addedAt: input.addedAt ?? Date.now(),
 });
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
 const resolveUserId = (req: Request): string | undefined => {
-  const headerUserId = req.header("x-user-id")?.trim();
-  if (headerUserId) {
-    return headerUserId;
+  const headerUserId = req.header("x-user-id");
+  if (isNonEmptyString(headerUserId)) {
+    return headerUserId.trim();
   }
 
-  const queryUserId = req.query.userId;
-  if (typeof queryUserId === "string" && queryUserId.trim()) {
-    return queryUserId.trim();
+  const queryValue = req.query.userId;
+  if (isNonEmptyString(queryValue)) {
+    return queryValue.trim();
   }
-  if (Array.isArray(queryUserId)) {
-    const first = queryUserId.find((value) => typeof value === "string" && value.trim());
-    if (first) {
-      return first.trim();
+
+  if (Array.isArray(queryValue)) {
+    const firstMatch = queryValue.find(isNonEmptyString);
+    if (firstMatch) {
+      return firstMatch.trim();
     }
   }
 
