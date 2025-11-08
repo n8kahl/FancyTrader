@@ -28,5 +28,5 @@ export function setupRoutes(app: Express, services: Services): void {
   setupBacktestRoutes(app);
   setupAlertsRoutes(app, services.alertRegistry);
   setupShareRoutes(app);
-  setupTradesRoutes(app, services);
+  setupTradesRoutes(app);
 }

@@ -1,76 +1,118 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { Router } from "express";
-import { randomUUID } from "node:crypto";
-import type { SupabaseService } from "../services/supabaseService";
-import { asyncHandler } from "../utils/asyncHandler";
-import { notFound } from "../utils/httpError";
+import { z } from "zod";
 import {
-  tradeCreateSchema,
-  tradeDtoSchema,
-  tradeIdParamSchema,
-  tradeUpdateSchema,
-} from "../validation/schemas";
+  TradeCreate,
+  TradeUpdate,
+  listTrades,
+  createTrade,
+  getTrade,
+  updateTrade,
+  deleteTrade,
+} from "../services/tradeService";
+import { asyncHandler } from "../utils/asyncHandler";
 
-interface Services {
-  supabaseService: SupabaseService;
+const idParamSchema = z.object({ id: z.string().min(1) });
+const missingUserResponse = { error: "Missing userId (x-user-id header or ?userId=)" };
+
+function resolveOwner(req: Request): string | null {
+  const header = req.header("x-user-id");
+  if (header) return header;
+  const queryId = req.query.userId;
+  if (typeof queryId === "string" && queryId.trim()) {
+    return queryId.trim();
+  }
+  return null;
 }
 
-export function setupTradesRoutes(app: Express, services: Services): void {
+export function setupTradesRoutes(app: Express): void {
   const router = Router();
-  const { supabaseService } = services;
 
   router.get(
     "/",
-    asyncHandler(async (_req, res) => {
-      const trades = await supabaseService.getTrades();
-      res.json({ trades });
-    })
-  );
-
-  router.get(
-    "/:id",
     asyncHandler(async (req, res) => {
-      const { id } = tradeIdParamSchema.parse(req.params);
-      const trade = await supabaseService.getTradeById(id);
-      if (!trade) {
-        throw notFound("Trade not found");
+      const owner = resolveOwner(req);
+      if (!owner) {
+        res.status(400).json(missingUserResponse);
+        return;
       }
-      res.json({ trade });
+      const trades = await listTrades(owner);
+      res.json(trades);
     })
   );
 
   router.post(
     "/",
     asyncHandler(async (req, res) => {
-      const payload = tradeCreateSchema.parse(req.body);
-      const id = payload.id ?? randomUUID();
-      const trade = tradeDtoSchema.parse({ ...payload, id });
-      const saved = await supabaseService.upsertTrade(trade);
-      res.status(201).json({ ok: true, trade: saved });
+      const owner = resolveOwner(req);
+      if (!owner) {
+        res.status(400).json(missingUserResponse);
+        return;
+      }
+      const parsed = TradeCreate.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.errors });
+        return;
+      }
+      const created = await createTrade(owner, parsed.data);
+      res.status(201).json(created);
     })
   );
 
-  router.put(
+  router.get(
     "/:id",
     asyncHandler(async (req, res) => {
-      const { id } = tradeIdParamSchema.parse(req.params);
-      const body = tradeUpdateSchema.parse({ ...req.body, id });
-      const existing = await supabaseService.getTradeById(id);
-      if (!existing) {
-        throw notFound("Trade not found");
+      const owner = resolveOwner(req);
+      if (!owner) {
+        res.status(400).json(missingUserResponse);
+        return;
       }
-      const updated = await supabaseService.upsertTrade(body);
-      res.json({ ok: true, trade: updated });
+      const { id } = idParamSchema.parse(req.params);
+      const trade = await getTrade(owner, id);
+      if (!trade) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      res.json(trade);
+    })
+  );
+
+  router.patch(
+    "/:id",
+    asyncHandler(async (req, res) => {
+      const owner = resolveOwner(req);
+      if (!owner) {
+        res.status(400).json(missingUserResponse);
+        return;
+      }
+      const { id } = idParamSchema.parse(req.params);
+      const parsed = TradeUpdate.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.errors });
+        return;
+      }
+      const updated = await updateTrade(owner, id, parsed.data);
+      if (!updated) {
+        res.status(404).json({ error: "Not found" });
+        return;
+      }
+      res.json(updated);
     })
   );
 
   router.delete(
     "/:id",
     asyncHandler(async (req, res) => {
-      const { id } = tradeIdParamSchema.parse(req.params);
-      const removed = await supabaseService.deleteTrade(id);
+      const owner = resolveOwner(req);
+      if (!owner) {
+        res.status(400).json(missingUserResponse);
+        return;
+      }
+      const { id } = idParamSchema.parse(req.params);
+      const removed = await deleteTrade(owner, id);
       if (!removed) {
-        throw notFound("Trade not found");
+        res.status(404).json({ error: "Not found" });
+        return;
       }
       res.json({ ok: true });
     })
