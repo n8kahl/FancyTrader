@@ -313,16 +313,15 @@ export default function App({ backendDeps }: AppProps = {}) {
   };
 
   const filteredTrades = getFilteredTrades();
-  const activeTrades: UiTrade[] = trades
-    .filter(
-      (t) =>
-        t.optionsContract &&
-        (t.status === "ACTIVE" ||
-          t.status === "PARTIAL_EXIT" ||
-          t.tradeState === "LOADED" ||
-          t.tradeState === "ENTERED")
-    )
-    .map(toUiTrade);
+const activeTrades: UiTrade[] = trades
+  .filter(
+    (t) =>
+      t.status === "ACTIVE" ||
+      t.status === "PARTIAL_EXIT" ||
+      t.tradeState === "LOADED" ||
+      t.tradeState === "ENTERED"
+  )
+  .map(toUiTrade);
 
   const handleSendAlert = (trade: Trade) => {
     setAlertTrade(trade);
@@ -768,8 +767,8 @@ export default function App({ backendDeps }: AppProps = {}) {
         </div>
       </main>
 
-      {/* Active Trades Bottom Panel (diagnostics only) */}
-      {DIAGNOSTICS_ENABLED && activeTrades.length > 0 && (
+      {/* Active Trades Bottom Panel */}
+      {activeTrades.length > 0 && (
         <ActiveTradesPanel
           trades={activeTrades}
           onViewDetails={(trade) => setSelectedTrade(trade)}
