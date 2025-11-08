@@ -22,8 +22,8 @@ export function supabaseForUser(accessToken: string): SupabaseClient {
   });
 }
 
-export function assertAdminClient(): asserts supabaseAdmin is SupabaseClient {
-  if (!supabaseAdmin) {
+export function assertAdminClient(client: SupabaseClient | null = supabaseAdmin): asserts client is SupabaseClient {
+  if (!client) {
     throw new Error("Supabase admin client not available. Set SUPABASE_URL and SUPABASE_SERVICE_KEY.");
   }
 }

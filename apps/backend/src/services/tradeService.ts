@@ -31,7 +31,7 @@ type TradeRecord = {
   side: "BUY" | "SELL";
   entry: number;
   qty: number;
-  stop?: number;
+  stop?: number | null;
   targets?: number[];
   notes?: string;
   status: "OPEN" | "CLOSED" | "CANCELLED";
@@ -45,12 +45,18 @@ const uuid = (): string =>
     ? crypto.randomUUID()
     : `${Math.random().toString(36).slice(2)}${Date.now()}`;
 
+
+const requireAdmin = () => {
+  const client = supabaseAdmin;
+  assertAdminClient(client);
+  return client;
+};
 export async function listTrades(owner: string): Promise<TradeRecord[]> {
   if (USE_MEMORY || !supabaseAdmin) {
     return (mem[owner] ?? []).sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
-  assertAdminClient();
-  const { data, error } = await supabaseAdmin
+  const admin = requireAdmin();
+  const { data, error } = await admin
     .from("trades")
     .select("*")
     .eq("owner", owner)
@@ -73,8 +79,8 @@ export async function createTrade(owner: string, payload: CreatePayload): Promis
     mem[owner].unshift(rec);
     return rec;
   }
-  assertAdminClient();
-  const { data, error } = await supabaseAdmin
+  const admin = requireAdmin();
+  const { data, error } = await admin
     .from("trades")
     .insert([{ owner, status: "OPEN", ...payload }])
     .select()
@@ -87,8 +93,8 @@ export async function getTrade(owner: string, id: string): Promise<TradeRecord |
   if (USE_MEMORY || !supabaseAdmin) {
     return (mem[owner] ?? []).find((t) => t.id === id) ?? null;
   }
-  assertAdminClient();
-  const { data, error } = await supabaseAdmin
+  const admin = requireAdmin();
+  const { data, error } = await admin
     .from("trades")
     .select("*")
     .eq("id", id)
@@ -112,8 +118,8 @@ export async function updateTrade(
     list[i] = next;
     return next;
   }
-  assertAdminClient();
-  const { data, error } = await supabaseAdmin
+  const admin = requireAdmin();
+  const { data, error } = await admin
     .from("trades")
     .update({ ...partial })
     .eq("id", id)
@@ -133,8 +139,8 @@ export async function deleteTrade(owner: string, id: string): Promise<boolean> {
     list.splice(i, 1);
     return true;
   }
-  assertAdminClient();
-  const { error, count } = await supabaseAdmin
+  const admin = requireAdmin();
+  const { error, count } = await admin
     .from("trades")
     .delete({ count: "exact" })
     .eq("id", id)

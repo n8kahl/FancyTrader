@@ -197,9 +197,6 @@ export class SupabaseService {
         .single();
 
       if (error || !data) {
-        if (this.inMemoryTrades.length > 0) {
-          return [...this.inMemoryTrades];
-        }
         return [];
       }
 
