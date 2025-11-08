@@ -26,12 +26,31 @@ const backtestShareSchema = z.object({
 export function setupShareRoutes(app: Express): void {
   const router = Router();
   const discord = new DiscordService();
+  const discordDisabled =
+    (process.env.DISCORD_ENABLED ?? "true").toLowerCase() === "false" ||
+    !process.env.DISCORD_WEBHOOK_URL;
+
+  const guardDiscord = (res: Response): boolean => {
+    if (!discordDisabled) {
+      return false;
+    }
+    res.status(409).json({
+      error: {
+        message: "Discord is disabled or webhook not configured",
+        code: "DISCORD_DISABLED",
+      },
+    });
+    return true;
+  };
 
   router.post(
     "/discord/trade",
     idempotencyMiddleware,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
+        if (guardDiscord(res)) {
+          return;
+        }
         const parsed = tradeShareSchema.parse(req.body);
         const result = await discord.sendTradeShare(parsed.trade, {
           webhook: process.env.DISCORD_WEBHOOK_URL,
@@ -49,6 +68,9 @@ export function setupShareRoutes(app: Express): void {
     idempotencyMiddleware,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
+        if (guardDiscord(res)) {
+          return;
+        }
         const parsed = backtestShareSchema.parse(req.body);
         const result = await discord.sendBacktestShare(parsed.summary, {
           link: parsed.link,

@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { Toaster } from "./components/ui/sonner";
 import { toast } from "sonner";
+import { apiClient, ApiErrorEx } from "./services/apiClient";
 import { ALL_STRATEGIES } from "./config/strategies";
 import { DEFAULT_WATCHLIST } from "./config/watchlist";
 import type { BackendConnectionDependencies } from "./hooks/backendConnectionDeps";
@@ -333,8 +334,13 @@ export default function App({ backendDeps }: AppProps = {}) {
     try {
       await apiClient.shareTradeToDiscord(alertTrade);
     } catch (error) {
-      logger.error("Failed to send Discord alert", error);
-      toast.error("Failed to send Discord alert: backend error");
+      const disabled = error instanceof ApiErrorEx && error.code === "DISCORD_DISABLED";
+      if (disabled) {
+        toast.error("Discord is disabled. Set DISCORD_ENABLED=true and configure DISCORD_WEBHOOK_URL.");
+      } else {
+        logger.error("Failed to send Discord alert", error);
+        toast.error("Failed to send Discord alert");
+      }
     }
 
     const alert: TradeAlert = {
@@ -411,8 +417,13 @@ export default function App({ backendDeps }: AppProps = {}) {
     try {
       await apiClient.shareTradeToDiscord(tradeProgressTrade);
     } catch (error) {
-      logger.error("Failed to send Discord alert", error);
-      toast.error("Failed to send Discord alert: backend error");
+      const disabled = error instanceof ApiErrorEx && error.code === "DISCORD_DISABLED";
+      if (disabled) {
+        toast.error("Discord is disabled. Set DISCORD_ENABLED=true and configure DISCORD_WEBHOOK_URL.");
+      } else {
+        logger.error("Failed to send Discord alert", error);
+        toast.error("Failed to send Discord alert");
+      }
     }
 
     const alert: TradeAlert = {

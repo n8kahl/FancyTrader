@@ -713,8 +713,13 @@ class ApiClient {
   }
 
   async shareTradeToDiscord(trade: Trade): Promise<{ id: string }> {
+    const idempotencyKey =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `share-${Date.now()}-${Math.random()}`;
     const response = await this.fetch<unknown>(API_ENDPOINTS.shareTrade(), {
       method: "POST",
+      headers: { "X-Idempotency-Key": idempotencyKey },
       body: JSON.stringify({ trade }),
     });
     const parsed = shareResponseSchema.parse(response);
