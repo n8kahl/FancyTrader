@@ -730,14 +730,12 @@ export default function App({ backendDeps }: AppProps = {}) {
         onSend={handleAlertSent}
       />
 
-      {DIAGNOSTICS_ENABLED && (
-        <StrategySettings
-          open={showStrategySettings}
-          onOpenChange={setShowStrategySettings}
-          enabledStrategies={enabledStrategies}
-          onStrategiesChange={setEnabledStrategies}
-        />
-      )}
+      <StrategySettings
+        open={showStrategySettings}
+        onOpenChange={setShowStrategySettings}
+        enabledStrategies={enabledStrategies}
+        onStrategiesChange={setEnabledStrategies}
+      />
 
       <WatchlistManager
         open={showWatchlistManager}
