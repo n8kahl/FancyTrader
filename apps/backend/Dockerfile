@@ -1,26 +1,38 @@
+# ---------- base ----------
 FROM node:20-alpine AS base
-WORKDIR /app
+ENV PNPM_HOME="/root/.local/share/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 
-FROM base AS deps
-COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY package.json ./
-COPY packages/shared/package.json packages/shared/package.json
-COPY apps/backend/package.json apps/backend/package.json
-RUN corepack prepare pnpm@9.12.0 --activate \
-  && pnpm install --frozen-lockfile
+# ---------- builder ----------
+FROM base AS builder
+WORKDIR /app
 
-FROM deps AS build
+# Copy only workspace manifests for better caching
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY apps/backend/package.json apps/backend/package.json
+COPY packages/shared/package.json packages/shared/package.json
+
+RUN pnpm install --frozen-lockfile
+
+# Bring in the full source and build shared + backend
 COPY . .
 RUN pnpm --filter ./packages/shared build \
   && pnpm --filter ./apps/backend build
 
+# Produce a minimal runtime payload for the backend with pruned deps
+RUN pnpm --filter ./apps/backend deploy --prod /app/runtime
+
+# ---------- runner ----------
 FROM node:20-alpine AS runner
-WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=build /app/apps/backend/dist ./dist
-COPY --from=build /app/apps/backend/package.json ./package.json
-COPY --from=build /app/packages ./packages
+WORKDIR /app
+
+RUN addgroup -S nodejs && adduser -S nodeuser -G nodejs
+
+COPY --from=builder /app/runtime/ ./
+
+ENV PORT=3001
 EXPOSE 3001
+USER nodeuser
 CMD ["node","dist/index.js"]

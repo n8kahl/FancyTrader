@@ -5,10 +5,9 @@
     "declaration": true,
     "emitDeclarationOnly": false,
     "sourceMap": true,
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
-    "target": "ES2019",
-    "jsx": "react-jsx"
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "target": "ES2019"
   },
   "include": ["src"]
 }
