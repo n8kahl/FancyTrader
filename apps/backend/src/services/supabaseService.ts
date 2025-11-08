@@ -3,6 +3,7 @@ import { z } from "zod";
 import { setupTypeSchema } from "@fancytrader/shared/cjs";
 import { DetectedSetup, WatchlistSymbol, StrategyConfig } from "../types";
 import { logger } from "../utils/logger";
+import { tradeDtoSchema, type TradeDto } from "../validation/schemas";
 
 const kvRowSchema = z.object({
   value: z.string(),
@@ -78,6 +79,8 @@ const watchlistSymbolSchema = z.object({
 
 const watchlistArraySchema = z.array(watchlistSymbolSchema);
 
+const tradesArraySchema = z.array(tradeDtoSchema);
+
 const strategyConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -102,9 +105,16 @@ const normalizeWatchlistSymbol = (symbol: z.infer<typeof watchlistSymbolSchema>)
   addedAt: symbol.addedAt ?? Date.now(),
 });
 
+const normalizeTradeRecord = (trade: TradeDto): TradeDto => ({
+  ...trade,
+  symbol: trade.symbol.toUpperCase(),
+});
+
 export class SupabaseService {
   private supabase: SupabaseClient | null = null;
   private enabled: boolean;
+  private inMemoryTrades: TradeDto[] = [];
+  private readonly tradesKey = "trades";
 
   constructor() {
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -215,6 +225,84 @@ export class SupabaseService {
       logger.error("Failed to save strategy config", { error });
     }
   }
+
+
+  private async persistTrades(trades: TradeDto[]): Promise<void> {
+    this.inMemoryTrades = trades;
+    if (!this.supabase) {
+      return;
+    }
+
+    try {
+      const { error } = await this.supabase.from("kv_store_c59dbecd").upsert({
+        key: this.tradesKey,
+        value: JSON.stringify(trades),
+      });
+
+      if (error) {
+        logger.error("Error saving trades to Supabase", { error });
+      }
+    } catch (error: unknown) {
+      logger.error("Failed to save trades", { error });
+    }
+  }
+
+  async getTrades(): Promise<TradeDto[]> {
+    if (!this.supabase) {
+      return [...this.inMemoryTrades];
+    }
+
+    try {
+      const { data, error } = await this.supabase
+        .from("kv_store_c59dbecd")
+        .select("value")
+        .eq("key", this.tradesKey)
+        .single();
+
+      if (error || !data) {
+        return [];
+      }
+
+      const parsedRow = kvRowSchema.parse(data);
+      const stored = parseStoredJson(parsedRow.value, tradesArraySchema);
+      const normalized = stored.map(normalizeTradeRecord);
+      this.inMemoryTrades = normalized;
+      return normalized;
+    } catch (error: unknown) {
+      logger.error("Failed to fetch trades", { error });
+      return [...this.inMemoryTrades];
+    }
+  }
+
+  async getTradeById(id: string): Promise<TradeDto | null> {
+    const trades = await this.getTrades();
+    return trades.find((trade) => trade.id === id) ?? null;
+  }
+
+  async upsertTrade(trade: TradeDto): Promise<TradeDto> {
+    const normalized = normalizeTradeRecord(trade);
+    const trades = await this.getTrades();
+    const existingIndex = trades.findIndex((t) => t.id === normalized.id);
+    const updated = existingIndex >= 0
+      ? trades.map((t) => (t.id === normalized.id ? normalized : t))
+      : [...trades, normalized];
+
+    await this.persistTrades(updated);
+    return normalized;
+  }
+
+  async deleteTrade(id: string): Promise<boolean> {
+    const trades = await this.getTrades();
+    const updated = trades.filter((trade) => trade.id !== id);
+
+    if (updated.length === trades.length) {
+      return false;
+    }
+
+    await this.persistTrades(updated);
+    return true;
+  }
+
 
   async getStrategyConfig(userId: string): Promise<StrategyConfig[]> {
     if (!this.supabase) return [];

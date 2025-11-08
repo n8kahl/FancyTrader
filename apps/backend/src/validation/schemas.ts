@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { tradeStatusSchema } from "@fancytrader/shared/cjs";
+
 
 export const symbolParamSchema = z.object({ symbol: z.string().min(1) });
 export const symbolWithOptionParamSchema = z.object({
@@ -51,3 +53,26 @@ export const watchlistBulkSchema = z.object({
 });
 
 export type WatchlistInput = z.infer<typeof watchlistAddSchema>;
+
+export const tradeIdParamSchema = z.object({ id: z.string().min(1) });
+
+const tradeBaseSchema = z.object({
+  symbol: z.string().trim().min(1),
+  entryPrice: z.number(),
+  stop: z.number(),
+  target: z.number(),
+  status: tradeStatusSchema,
+});
+
+export const tradeCreateSchema = tradeBaseSchema.extend({
+  id: z.string().min(1).optional(),
+});
+
+export const tradeUpdateSchema = tradeBaseSchema.extend({
+  id: z.string().min(1),
+});
+
+export const tradeDtoSchema = tradeUpdateSchema;
+
+export type TradeDto = z.infer<typeof tradeDtoSchema>;
+
