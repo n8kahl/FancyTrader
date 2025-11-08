@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { setupTypeSchema } from "@fancytrader/shared";
+import { setupTypeSchema } from "@fancytrader/shared/cjs";
 import { DetectedSetup, WatchlistSymbol, StrategyConfig } from "../types";
 import { logger } from "../utils/logger";
 

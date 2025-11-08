@@ -1,4 +1,4 @@
-import type { AlertCondition } from "@fancytrader/shared";
+import type { AlertCondition } from "@fancytrader/shared/cjs";
 
 export interface Alert {
   id: string;

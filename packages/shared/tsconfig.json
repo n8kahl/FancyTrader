@@ -5,8 +5,8 @@
     "declaration": true,
     "emitDeclarationOnly": false,
     "sourceMap": true,
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "target": "ES2019"
   },
   "include": ["src"]

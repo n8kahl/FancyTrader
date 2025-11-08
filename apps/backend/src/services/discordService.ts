@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Trade as SharedTrade } from "@fancytrader/shared";
+import type { Trade as SharedTrade } from "@fancytrader/shared/cjs";
 import { DiscordAlert, DetectedSetup, OptionsContract } from "../types";
 import { logger } from "../utils/logger";
 import { HttpError } from "../utils/httpError";

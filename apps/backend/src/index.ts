@@ -1,5 +1,5 @@
 import "dotenv/config";
-import type { ServerOutbound } from "@fancytrader/shared";
+import type { ServerOutbound } from "@fancytrader/shared/cjs";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import { setupWebSocketHandler } from "./websocket/handler";

@@ -4,7 +4,7 @@ import type {
   ConfidenceBreakdown,
   ConfluenceScore,
   ConfluenceKey,
-} from "@fancytrader/shared";
+} from "@fancytrader/shared/cjs";
 import {
   Bar,
   Trade,

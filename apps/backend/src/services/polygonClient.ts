@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import { z } from "zod";
-import type { OptionContract } from "@fancytrader/shared";
+import type { OptionContract } from "@fancytrader/shared/cjs";
 import { logger } from "../utils/logger";
 import { Bar } from "../types";
 import { followNextUrls, encodeCursor, decodeCursor, type PageShape } from "../utils/polygonPage";

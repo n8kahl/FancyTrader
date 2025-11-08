@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { Router } from "express";
 import { z } from "zod";
-import type { StrategyParams } from "@fancytrader/shared";
-import { strategyParamsSchema } from "@fancytrader/shared";
+import type { StrategyParams } from "@fancytrader/shared/cjs";
+import { strategyParamsSchema } from "@fancytrader/shared/cjs";
 import { fetchAggregates, runDetectors, type BacktestConfig } from "../backtest/runner";
 import { bucketByWeek, computePnL } from "../backtest/metrics";
 import { PolygonClient } from "../services/polygonClient";

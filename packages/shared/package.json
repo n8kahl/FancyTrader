@@ -2,31 +2,36 @@
   "name": "@fancytrader/shared",
   "version": "0.0.1",
   "private": false,
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -b",
+    "build": "tsup src/index.ts --dts --format cjs,esm",
     "clean": "rimraf dist"
   },
   "dependencies": {
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "8.12.2",
-    "@typescript-eslint/parser": "8.12.2",
-    "@vitest/coverage-v8": "2.1.4",
-    "eslint": "9.14.0",
     "rimraf": "5.0.5",
-    "tslib": "^2.8.1",
-    "typescript": "5.6.3",
-    "vitest": "2.1.4"
+    "tsup": "^8.0.1",
+    "typescript": "5.6.3"
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./cjs": {
+      "types": "./dist/index.d.cts",
+      "import": "./dist/index.cjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.cjs"
     }
   }
 }

@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { Router } from "express";
 import { z } from "zod";
-import { alertConditionSchema } from "@fancytrader/shared";
+import { alertConditionSchema } from "@fancytrader/shared/cjs";
 import { AlertRegistry } from "../alerts/registry";
 import { badRequest, notFound } from "../utils/httpError";
 

@@ -1,6 +1,6 @@
 import type { Bar } from "../types";
 import type { PolygonClient } from "../services/polygonClient";
-import type { StrategyParams } from "@fancytrader/shared";
+import type { StrategyParams } from "@fancytrader/shared/cjs";
 import { defaultStrategyParams } from "../config/strategy.defaults";
 
 export interface BacktestConfig {

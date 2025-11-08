@@ -4,7 +4,7 @@ import type { SupabaseService } from "../services/supabaseService";
 import type { StrategyDetectorService } from "../services/strategyDetector";
 import type { PolygonStreamingService } from "../services/polygonStreamingService";
 import { asyncHandler } from "../utils/asyncHandler";
-import { strategyParamsSchema, type StrategyParams } from "@fancytrader/shared";
+import { strategyParamsSchema, type StrategyParams } from "@fancytrader/shared/cjs";
 import { defaultStrategyParams } from "../config/strategy.defaults";
 import { badRequest } from "../utils/httpError";
 import {

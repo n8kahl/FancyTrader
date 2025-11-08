@@ -1,6 +1,6 @@
 import { WebSocketServer } from "ws";
 import type { RawData, WebSocket } from "ws";
-import type { ServerOutbound } from "@fancytrader/shared";
+import type { ServerOutbound } from "@fancytrader/shared/cjs";
 import { z } from "zod";
 import { WSMessage, DetectedSetup } from "../types";
 import { PolygonStreamingService } from "../services/polygonStreamingService";
