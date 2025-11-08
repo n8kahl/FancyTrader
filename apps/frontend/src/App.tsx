@@ -328,19 +328,58 @@ export default function App({ backendDeps }: AppProps = {}) {
     setAlertTrade(trade);
   };
 
+  const mapAlertTypeToShareType = (type: AlertType):
+    | "ENTRY"
+    | "TRIM_25"
+    | "TRIM_50"
+    | "ADD"
+    | "STOP_LOSS"
+    | "TARGET_HIT"
+    | "EXIT_ALL"
+    | "CUSTOM" => {
+    switch (type) {
+      case "LOAD":
+      case "ENTRY":
+        return "ENTRY";
+      case "TRIM_25":
+        return "TRIM_25";
+      case "TRIM_50":
+        return "TRIM_50";
+      case "ADD":
+        return "ADD";
+      case "STOP_ADJUST":
+        return "STOP_LOSS";
+      case "TARGET_HIT":
+        return "TARGET_HIT";
+      case "EXIT_ALL":
+        return "EXIT_ALL";
+      case "CUSTOM":
+      default:
+        return "CUSTOM";
+    }
+  };
+
+  const handleDiscordError = (error: unknown) => {
+    const disabled = error instanceof ApiErrorEx && error.code === "DISCORD_DISABLED";
+    if (disabled) {
+      toast.error("Discord is disabled. Set DISCORD_ENABLED=true and configure DISCORD_WEBHOOK_URL.");
+    } else {
+      logger.error("Failed to send Discord alert", error);
+      toast.error("Failed to send Discord alert");
+    }
+  };
+
   const handleAlertSent = async (payload: { channel: string; content: string }) => {
     if (!alertTrade) return;
 
     try {
-      await apiClient.shareTradeToDiscord(alertTrade);
+      await apiClient.shareCustomDiscord({
+        symbol: alertTrade.symbol,
+        type: "CUSTOM",
+        content: payload.content,
+      });
     } catch (error) {
-      const disabled = error instanceof ApiErrorEx && error.code === "DISCORD_DISABLED";
-      if (disabled) {
-        toast.error("Discord is disabled. Set DISCORD_ENABLED=true and configure DISCORD_WEBHOOK_URL.");
-      } else {
-        logger.error("Failed to send Discord alert", error);
-        toast.error("Failed to send Discord alert");
-      }
+      handleDiscordError(error);
     }
 
     const alert: TradeAlert = {
@@ -415,15 +454,13 @@ export default function App({ backendDeps }: AppProps = {}) {
     if (!tradeProgressTrade) return;
 
     try {
-      await apiClient.shareTradeToDiscord(tradeProgressTrade);
+      await apiClient.shareCustomDiscord({
+        symbol: tradeProgressTrade.symbol,
+        type: mapAlertTypeToShareType(type),
+        content: message,
+      });
     } catch (error) {
-      const disabled = error instanceof ApiErrorEx && error.code === "DISCORD_DISABLED";
-      if (disabled) {
-        toast.error("Discord is disabled. Set DISCORD_ENABLED=true and configure DISCORD_WEBHOOK_URL.");
-      } else {
-        logger.error("Failed to send Discord alert", error);
-        toast.error("Failed to send Discord alert");
-      }
+      handleDiscordError(error);
     }
 
     const alert: TradeAlert = {

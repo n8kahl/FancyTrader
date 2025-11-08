@@ -10,6 +10,16 @@ import type { OptionsContract } from "@/types/options";
 
 type UnknownRecord = Record<string, unknown>;
 
+type DiscordShareAction =
+  | "ENTRY"
+  | "TRIM_25"
+  | "TRIM_50"
+  | "ADD"
+  | "STOP_LOSS"
+  | "TARGET_HIT"
+  | "EXIT_ALL"
+  | "CUSTOM";
+
 export interface BackendSetup {
   id: string;
   symbol: string;
@@ -732,6 +742,24 @@ class ApiClient {
       body: JSON.stringify(payload),
     });
     const parsed = shareResponseSchema.parse(response);
+    return { id: parsed.id };
+  }
+
+  async shareCustomDiscord(payload: {
+    symbol: string;
+    type: DiscordShareAction;
+    content: string;
+  }): Promise<{ id: string }> {
+    const idempotencyKey =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `share-${Date.now()}-${Math.random()}`;
+    const response = await this.fetch<unknown>(API_ENDPOINTS.shareCustom(), {
+      method: "POST",
+      headers: { "X-Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(payload),
+    });
+    const parsed = z.object({ ok: z.literal(true), id: z.string() }).parse(response);
     return { id: parsed.id };
   }
 }

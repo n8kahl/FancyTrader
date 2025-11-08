@@ -66,16 +66,32 @@ describe("rate limit middleware", () => {
     }
   });
 
-  it("blocks share requests once the limit is reached", async () => {
+  it("blocks share trade requests once the limit is reached", async () => {
     process.env.RATE_LIMIT_MAX = "2";
     delete process.env.DISCORD_WEBHOOK_URL;
     const app = buildApp();
 
     for (let i = 0; i < 2; i += 1) {
-      await request(app).post("/api/share/discord/trade").send(sharePayload).expect(400);
+      await request(app).post("/api/share/discord/trade").send(sharePayload).expect(409);
     }
 
     const res = await request(app).post("/api/share/discord/trade").send(sharePayload);
+    expect(res.status).toBe(429);
+    expect(res.body.error).toMatch(/Rate limit exceeded/i);
+  });
+
+  it("blocks share alert requests once the limit is reached", async () => {
+    process.env.RATE_LIMIT_MAX = "2";
+    delete process.env.DISCORD_WEBHOOK_URL;
+    const app = buildApp();
+
+    const customPayload = { symbol: "SPY", type: "TRIM_50", content: "Trim" };
+
+    for (let i = 0; i < 2; i += 1) {
+      await request(app).post("/api/share/discord/alert").send(customPayload).expect(409);
+    }
+
+    const res = await request(app).post("/api/share/discord/alert").send(customPayload);
     expect(res.status).toBe(429);
     expect(res.body.error).toMatch(/Rate limit exceeded/i);
   });

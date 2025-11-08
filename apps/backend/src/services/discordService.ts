@@ -42,9 +42,11 @@ export interface BacktestShareOptions extends DiscordSendOptions {
   note?: string;
 }
 
-interface DiscordPayload {
+interface DiscordEmbedPayload {
   embeds: DiscordEmbed[];
 }
+
+type DiscordPayload = DiscordEmbedPayload | { content: string };
 
 const parseBoolean = (value: string | undefined, fallback: boolean): boolean => {
   if (value === undefined) {
@@ -210,6 +212,23 @@ export class DiscordService {
       const message = error instanceof Error ? error.message : String(error);
       logger.error("Failed to send Discord alert", { error: message });
     }
+  }
+
+  async sendPlainContent(message: string, options?: DiscordSendOptions): Promise<{ id: string }> {
+    if (!this.enabled) {
+      logger.debug("Discord alerts disabled; skipping plain send.");
+      return { id: randomUUID() };
+    }
+
+    await postWithRetry(
+      { content: message },
+      {
+        webhook: options?.webhook ?? this.webhookUrl,
+        idempotencyKey: options?.idempotencyKey,
+      }
+    );
+
+    return { id: randomUUID() };
   }
 
   /**

@@ -154,8 +154,8 @@ describe("Discord sharing resiliency", () => {
 
     const res = await request(app).post("/api/share/discord/trade").send(tradePayload);
 
-    expect(res.status).toBe(200);
-    expect(res.body.ok).toBe(true);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe("DISCORD_DISABLED");
     expect(nock.pendingMocks()).toHaveLength(0);
   });
 });

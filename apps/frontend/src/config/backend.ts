@@ -24,6 +24,7 @@ export const BACKEND_CONFIG = {
 
 // API endpoints
 export const API_ENDPOINTS = {
+  base: () => BACKEND_CONFIG.httpUrl,
   // Setups
   getSetups: () => `${BACKEND_CONFIG.httpUrl}/api/setups`,
   getSetupsBySymbol: (symbol: string) => `${BACKEND_CONFIG.httpUrl}/api/setups/${symbol}`,
@@ -55,6 +56,7 @@ export const API_ENDPOINTS = {
   // Share
   shareTrade: () => `${BACKEND_CONFIG.httpUrl}/api/share/discord/trade`,
   shareBacktest: () => `${BACKEND_CONFIG.httpUrl}/api/share/discord/backtest`,
+  shareCustom: () => `${BACKEND_CONFIG.httpUrl}/api/share/discord/alert`,
 
   // Chart annotations
   chartAnnotations: () => `${BACKEND_CONFIG.httpUrl}/api/chart/annotations`,
