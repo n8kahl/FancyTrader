@@ -1,0 +1,72 @@
+import type { Express, NextFunction, Request, Response } from "express";
+import { Router } from "express";
+import { z } from "zod";
+import { tradeSchema } from "@fancytrader/shared";
+import { DiscordService } from "../services/discordService";
+
+const tradeShareSchema = z.object({ trade: tradeSchema });
+
+const backtestSummarySchema = z.object({
+  winRate: z.number(),
+  totalR: z.number(),
+  maxDrawdownR: z.number(),
+  expectancyR: z.number(),
+  trades: z.number().optional(),
+  symbol: z.string().optional(),
+  strategy: z.string().optional(),
+});
+
+const backtestShareSchema = z.object({
+  summary: backtestSummarySchema,
+  link: z.string().url().optional(),
+  note: z.string().optional(),
+});
+
+export function setupShareRoutes(app: Express): void {
+  const router = Router();
+  const discord = new DiscordService();
+
+  router.post(
+    "/discord/trade",
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const webhook = process.env.DISCORD_WEBHOOK_URL;
+        if (!webhook) {
+          res.status(400).json({ ok: false, error: "Discord webhook not configured" });
+          return;
+        }
+
+        const parsed = tradeShareSchema.parse(req.body);
+        const result = await discord.sendTradeShare(parsed.trade, webhook);
+        res.json({ ok: true, id: result.id });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  router.post(
+    "/discord/backtest",
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const webhook = process.env.DISCORD_WEBHOOK_URL;
+        if (!webhook) {
+          res.status(400).json({ ok: false, error: "Discord webhook not configured" });
+          return;
+        }
+
+        const parsed = backtestShareSchema.parse(req.body);
+        const result = await discord.sendBacktestShare(parsed.summary, {
+          link: parsed.link,
+          note: parsed.note,
+          webhook,
+        });
+        res.json({ ok: true, id: result.id });
+      } catch (error) {
+        next(error);
+      }
+    }
+  );
+
+  app.use("/api/share", router);
+}
