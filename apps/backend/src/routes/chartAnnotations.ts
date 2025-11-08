@@ -22,17 +22,20 @@ const missingUserResponse = {
   error: "Missing userId (x-user-id header or ?userId=)",
 };
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
 const resolveUserId = (req: Request): string | null => {
   const header = req.header("x-user-id");
-  if (typeof header === "string" && header.trim().length > 0) {
+  if (isNonEmptyString(header)) {
     return header.trim();
   }
   const query = req.query.userId;
-  if (typeof query === "string" && query.trim().length > 0) {
+  if (isNonEmptyString(query)) {
     return query.trim();
   }
   if (Array.isArray(query)) {
-    const first = query.find((value) => typeof value === "string" && value.trim().length > 0);
+    const first = query.find(isNonEmptyString);
     if (first) {
       return first.trim();
     }
