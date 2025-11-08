@@ -1,0 +1,43 @@
+name: release-backend
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Enable pnpm@9
+        run: corepack enable && corepack prepare pnpm@9.12.0 --activate
+
+      - name: Install deps (frozen)
+        run: pnpm i --frozen-lockfile
+
+      - name: Verify
+        run: |
+          pnpm -r lint
+          pnpm -r typecheck
+          pnpm -r test -- --coverage
+          pnpm --filter ./packages/shared build
+          pnpm --filter ./apps/backend build
+
+      - name: Log in to GHCR
+        run: echo "${{ github.token }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build & push backend image
+        run: |
+          IMAGE=ghcr.io/${{ github.repository }}/backend
+          docker build -f apps/backend/Dockerfile -t $IMAGE:${{ github.sha }} -t $IMAGE:latest .
+          docker push $IMAGE:${{ github.sha }}
+          docker push $IMAGE:latest
