@@ -1,26 +1,20 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
+import react from "@vitejs/plugin-react";
+import path from "node:path";
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    extensions: [".js", ".jsx", ".ts", ".tsx", ".json"],
     alias: {
       "react-hook-form@7.55.0": "react-hook-form",
       "@jsr/supabase__supabase-js@2.49.8": "@jsr/supabase__supabase-js",
       "@": path.resolve(__dirname, "./src"),
+      "@fancytrader/shared": path.resolve(__dirname, "../../packages/shared/src"),
     },
   },
   build: {
-    target: "esnext",
     outDir: "build",
-    commonjsOptions: {
-      include: [/packages\/shared\/dist\/index\.js/, /node_modules/],
-    },
-  },
-  optimizeDeps: {
-    include: ["@fancytrader/shared"],
+    target: "esnext",
   },
   server: {
     port: 5173,
