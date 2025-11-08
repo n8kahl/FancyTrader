@@ -164,6 +164,7 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   });
 
   app.use(healthRouter);
+  app.use("/api", healthRouter);
   setupRoutes(app, services);
 
   app.use(errorHandler);

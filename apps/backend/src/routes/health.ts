@@ -3,6 +3,7 @@ import axios from "axios";
 import { metrics } from "../utils/metrics";
 import { featureFlags } from "../config/features";
 import type { PolygonServiceState } from "../services/polygonStreamingService";
+import { requireAdminKey } from "../middleware/adminKey";
 
 declare global {
   var __WSS_READY__: boolean | undefined;
@@ -85,8 +86,7 @@ router.get("/readyz", async (_req, res, next): Promise<void> => {
   }
 });
 
-router.get("/metrics", (_req, res): void => {
-  // TODO: protect this endpoint in production
+router.get("/metrics", requireAdminKey, (_req, res): void => {
   res.json(metrics);
 });
 
