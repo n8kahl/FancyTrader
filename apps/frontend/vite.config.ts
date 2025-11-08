@@ -10,6 +10,7 @@ export default defineConfig({
       "@jsr/supabase__supabase-js@2.49.8": "@jsr/supabase__supabase-js",
       "@": path.resolve(__dirname, "./src"),
       "@fancytrader/shared": path.resolve(__dirname, "../../packages/shared/dist/index.js"),
+      "@fancytrader/shared/cjs": path.resolve(__dirname, "../../packages/shared/dist/index.cjs"),
     },
   },
   build: {
@@ -25,6 +26,7 @@ export default defineConfig({
     setupFiles: "./src/setupTests.ts",
     alias: {
       "@fancytrader/shared": path.resolve(__dirname, "../../packages/shared/dist/index.js"),
+      "@fancytrader/shared/cjs": path.resolve(__dirname, "../../packages/shared/dist/index.cjs"),
     },
     deps: {
       inline: [/^@fancytrader\/shared$/],
