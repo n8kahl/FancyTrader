@@ -1,3 +1,4 @@
+import { ConnectionStatus } from "./components/ConnectionStatus";
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { TradeCard } from "./components/TradeCard";
@@ -159,6 +160,9 @@ export default function App({ backendDeps }: AppProps = {}) {
     trades: backendTrades,
     subscribeToSymbols,
     unsubscribeFromSymbols,
+    connectionStatus,
+    connectionReason,
+    manualReconnect,
   } = useBackendConnection(!useMockData, backendDeps);
 
   // Options Trading State
