@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "start:loop": "node -e \"import('./dist/index.js').then(m=>{const every=+process.env.WORKER_EVERY_MS||60000;const run=()=>m.main().catch(e=>console.error('Worker failed',e));run();setInterval(run,every);})\""
+    "start:loop": "node start.js"
   },
   "dependencies": {
     "@fancytrader/shared": "workspace:*",
