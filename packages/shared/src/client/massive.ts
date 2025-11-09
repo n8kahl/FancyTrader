@@ -26,21 +26,8 @@ export class MassiveClient {
       baseURL,
       timeout,
       headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+      // Massive (Polygon) also accepts apiKey as query param; we prefer bearer.
     });
-  }
-
-  private isOptionTicker(t: string): boolean {
-    return /^O:/.test(t);
-  }
-
-  private isIndexTicker(t: string): boolean {
-    return /^I:/.test(t);
-  }
-
-  private parseUnderlyingFromOption(t: string): string {
-    const raw = t.replace(/^O:/, "");
-    const m = raw.match(/^([A-Z\.]+)[0-9]/);
-    return m ? m[1] : raw;
   }
 
   private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
@@ -49,61 +36,88 @@ export class MassiveClient {
       try {
         return await fn();
       } catch (error) {
-        if (attempt >= this.maxRetries) {
-          throw error;
-        }
+        if (attempt >= this.maxRetries) throw error;
         const delay = Math.min(1000 * 2 ** attempt, 8000) + Math.random() * 250;
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise((r) => setTimeout(r, delay));
         attempt++;
       }
     }
   }
 
-  async getMarketStatus(): Promise<{ market: string; [key: string]: unknown }> {
+  // Market status (unchanged)
+  async getMarketStatus(): Promise<{ market: string; [k: string]: unknown }> {
     return this.withRetry(async () => {
       const { data } = await this.http.get("/v1/marketstatus/now");
       return data ?? {};
     });
   }
 
+  // ---------- INDICES ----------
+  // Example symbols: "I:SPX", "I:NDX", "I:VIX"
+  async getIndexSnapshot(indexSymbol: string): Promise<unknown> {
+    return this.withRetry(async () => {
+      const { data } = await this.http.get(
+        `/v2/snapshot/locale/us/markets/indices/tickers/${encodeURIComponent(indexSymbol)}`
+      );
+      // Polygon snapshot shape returns { ticker: {...} }
+      return data?.ticker ?? data ?? {};
+    });
+  }
+
+  // Minute aggregates for indices/ETFs/underlyings
   async getMinuteAggs(symbol: string, minutes = 30): Promise<unknown[]> {
     return this.withRetry(async () => {
       const to = new Date();
       const from = new Date(to.getTime() - minutes * 60_000);
-      const path = `/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/1/minute/${from.toISOString()}/${to.toISOString()}`;
+      const path = `/v2/aggs/ticker/${encodeURIComponent(
+        symbol
+      )}/range/1/minute/${from.toISOString()}/${to.toISOString()}`;
       const { data } = await this.http.get(path, {
-        params: { adjusted: true, sort: "asc", limit: minutes },
+        params: { adjusted: true, sort: "asc", limit: 50000 },
       });
       return Array.isArray(data?.results) ? data.results : [];
     });
   }
 
-  async getTickerSnapshot(symbol: string): Promise<unknown> {
+  // ---------- OPTIONS ----------
+  // Full options contracts listings (reference)
+  async getOptionsContracts(params: {
+    underlying: string;
+    expiration?: string;
+    type?: "call" | "put";
+    strike?: number;
+    limit?: number;
+  }): Promise<unknown> {
     return this.withRetry(async () => {
-      if (this.isOptionTicker(symbol)) {
-        const underlying = this.parseUnderlyingFromOption(symbol);
-        const { data } = await this.http.get(
-          `/v3/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(symbol)}`
-        );
-        return data?.results ?? {};
-      }
-
-      if (this.isIndexTicker(symbol)) {
-        const idx = symbol.replace(/^I:/, "");
-        const { data } = await this.http.get(
-          `/v3/snapshot/indices/${encodeURIComponent(idx)}`
-        );
-        return data ?? {};
-      }
-
+      const { underlying, expiration, type, strike, limit = 250 } = params;
       const { data } = await this.http.get(
-        `/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(symbol)}`
+        "/v3/reference/options/contracts",
+        {
+          params: {
+            underlying_ticker: underlying,
+            expiration_date: expiration,
+            contract_type: type,
+            strike_price: strike,
+            limit,
+          },
+        }
       );
-      return data?.ticker ?? {};
+      return data ?? {};
+    });
+  }
+
+  // Per-option live snapshot
+  async getOptionSnapshot(underlying: string, optionSymbol: string): Promise<unknown> {
+    return this.withRetry(async () => {
+      const { data } = await this.http.get(
+        `/v3/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(optionSymbol)}`
+      );
+      return data?.results ?? null;
     });
   }
 }
 
+// Helpers: mapping market status to our worker mode
 export function marketToMode(raw: any): MarketMode {
   const market = String(raw?.market ?? "").toLowerCase();
   if (market.includes("pre")) return "premarket";

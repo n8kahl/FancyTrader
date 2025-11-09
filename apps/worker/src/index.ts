@@ -3,6 +3,19 @@ import { pathToFileURL } from "node:url";
 import { MassiveClient, marketToMode } from "@fancytrader/shared";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+const OPTION_OCC_RE = /^([A-Z]+)\d{6}[CP]\d{8}$/i;
+
+function classifySymbol(symbol: string): "index" | "option" {
+  if (symbol.startsWith("I:")) return "index";
+  if (OPTION_OCC_RE.test(symbol)) return "option";
+  return "index";
+}
+
+function getUnderlyingFromOptionSymbol(optionSymbol: string): string {
+  const m = optionSymbol.toUpperCase().match(OPTION_OCC_RE);
+  return m ? m[1] : "";
+}
+
 type ScanMode = "premarket" | "regular" | "aftermarket" | "closed";
 type ScanStatus = "pending" | "running" | "success" | "failed";
 
@@ -81,9 +94,18 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
 
   try {
     if (mode === "closed") {
-      const snap = await massiveClient.getTickerSnapshot(symbol);
-      // TODO: compute & store setups from 'snap'
+      const kind = classifySymbol(symbol);
+      if (kind === "index") {
+        const snap = await massiveClient.getIndexSnapshot(symbol);
+        // TODO: compute & store setups from index 'snap'
+      } else {
+        const underlying = getUnderlyingFromOptionSymbol(symbol);
+        if (!underlying) throw new Error("Invalid option symbol");
+        const snap = await massiveClient.getOptionSnapshot(underlying, symbol);
+        // TODO: compute & store setups from option 'snap'
+      }
     } else {
+      // During live sessions, we aggregate **indices** (and ETFs if you include them)
       const aggs = await massiveClient.getMinuteAggs(symbol, 30);
       // TODO: compute & store setups from 'aggs'
     }
