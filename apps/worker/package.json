@@ -9,7 +9,7 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "start:loop": "node start.js"
+    "start:loop": "node start.mjs"
   },
   "dependencies": {
     "@fancytrader/shared": "workspace:*",
