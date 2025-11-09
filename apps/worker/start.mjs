@@ -16,7 +16,7 @@ const jobsInflight = new promClient.Gauge({
   name: "jobs_inflight",
   help: "Number of scan jobs currently executing",
 });
-const scanRuns = new promClient.Counter({
+const scanRunsTotal = new promClient.Counter({
   name: "scan_runs_total",
   help: "Scan runs by session/noop/result",
   labelNames: ["session", "noop", "result"],
@@ -28,8 +28,8 @@ const scanLatencyMs = new promClient.Histogram({
   labelNames: ["session", "noop", "result"],
 });
 
-function labels({ session = "unknown", noop = false, result = "success" } = {}) {
-  return { session, noop: String(noop), result };
+function labels({ session = "unknown", noop = false } = {}) {
+  return { session, noop: String(noop) };
 }
 
 const log = (...a) => console.log(...a);
@@ -57,22 +57,23 @@ const run = async (ctx = {}) => {
     console.error("[metrics] run skipped -- worker module not ready");
     return;
   }
-  const l = labels({ session: ctx.session, noop: ctx.noop, result: "success" });
-  const endTimer = scanLatencyMs.startTimer(l);
+  const { session, noop } = labels(ctx);
+  const start = Date.now();
   jobsInflight.inc();
   let resultLabel = "success";
   try {
     await m.main(ctx);
     scanSuccess.inc();
-    scanRuns.labels({ ...l, result: resultLabel }).inc();
+    scanRunsTotal.labels(session, noop, "success").inc();
     log("[diag] main() returned");
   } catch (e) {
     resultLabel = "failure";
     scanFailure.inc();
-    scanRuns.labels({ ...l, result: resultLabel }).inc();
+    scanRunsTotal.labels(session, noop, "failure").inc();
     console.error("[metrics] run failed", e);
   } finally {
-    endTimer({ result: resultLabel });
+    const durationMs = Date.now() - start;
+    scanLatencyMs.labels(session, noop, resultLabel).observe(durationMs);
     jobsInflight.dec();
   }
 };
@@ -88,15 +89,31 @@ const server = http.createServer(async (req, res) => {
     }
 
     if ((req.method === "GET" || req.method === "POST") && url.pathname === "/run-now") {
-      const session = url.searchParams.get("session") || null;
-      json(res, 200, { ok: true, accepted: true, session, ts: new Date().toISOString() });
+      const rawSession = String(url.searchParams.get("session") ?? "").toLowerCase();
+      const normalizedSession =
+        rawSession === "open" || rawSession === "closed" ? rawSession : null;
+      const session = normalizedSession ?? "unknown";
 
-      const m = await workerModPromise;
-      if (!m?.main) {
-        console.error("[run-now] worker module not ready");
-        return;
+      const rawNoop = String(url.searchParams.get("noop") ?? "").toLowerCase();
+      const noop =
+        rawNoop === "true" ||
+        rawNoop === "1" ||
+        rawNoop === "yes" ||
+        rawNoop === "y";
+
+      json(res, 200, {
+        ok: true,
+        accepted: true,
+        session,
+        noop,
+        ts: new Date().toISOString(),
+      });
+
+      const runCtx = { session, noop };
+      if (normalizedSession) {
+        runCtx.forceSession = normalizedSession;
       }
-      void run({ session, forceSession: session || undefined });
+      void run(runCtx);
       return;
     }
 
