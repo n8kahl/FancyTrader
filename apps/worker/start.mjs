@@ -1,6 +1,6 @@
-import http from "node:http";
-import { URL } from "node:url";
+import express from "express";
 import * as promClient from "prom-client";
+import { main as triggerRun } from "./dist/index.js";
 
 promClient.collectDefaultMetrics();
 
@@ -29,69 +29,29 @@ const scanLatencyMs = new promClient.Histogram({
 });
 
 function labels(opts = {}) {
-  const session = opts.session === "open" || opts.session === "closed" ? opts.session : "unknown";
+  const sessionRaw = (opts.session ?? "").toString().toLowerCase();
+  const session = sessionRaw === "open" || sessionRaw === "closed" ? sessionRaw : "unknown";
   const noop = Boolean(opts.noop);
   return { session, noop: String(noop) };
 }
 
 const log = (...a) => console.log(...a);
 
-const workerModPromise = import("./dist/index.js").catch((e) => {
-  console.error("[diag] import failed", e);
-  return null;
-});
-
-const EVERY = +process.env.WORKER_EVERY_MS || 60_000;
-const PORT = Number(process.env.PORT) || 8080;
-
-function json(res, code, obj) {
-  const body = JSON.stringify(obj);
-  res.writeHead(code, {
-    "content-type": "application/json",
-    "content-length": Buffer.byteLength(body),
-  });
-  res.end(body);
-}
-
-async function readJsonBody(req) {
-  if (req.method !== "POST") {
-    return null;
-  }
-  return new Promise((resolve) => {
-    let data = "";
-    req.on("data", (chunk) => {
-      data += chunk;
-    });
-    req.on("end", () => {
-      if (!data) {
-        resolve(null);
-        return;
-      }
-      try {
-        resolve(JSON.parse(data));
-      } catch {
-        resolve(null);
-      }
-    });
-    req.on("error", () => resolve(null));
-  });
-}
-
 const runOnce = async (ctx = {}) => {
-  const m = await workerModPromise;
-  if (!m?.main) {
-    console.error("[metrics] run skipped -- worker module not ready");
-    return;
-  }
   const { session, noop } = labels(ctx);
+  const runCtx = { ...ctx };
+  if (session !== "unknown") {
+    runCtx.forceSession = session;
+  }
+
   const start = Date.now();
   jobsInflight.inc();
   let resultLabel = "success";
   try {
-    await m.main(ctx);
+    await triggerRun(runCtx);
     scanSuccess.inc();
     scanRunsTotal.labels(session, noop, "success").inc();
-    log("[diag] main() returned");
+    log("[diag] main() returned", { session, noop, reason: ctx.reason });
   } catch (e) {
     resultLabel = "failure";
     scanFailure.inc();
@@ -104,79 +64,55 @@ const runOnce = async (ctx = {}) => {
   }
 };
 
-const server = http.createServer(async (req, res) => {
+const app = express();
+app.use(express.json());
+app.set("trust proxy", 1);
+
+app.get("/healthz", (_req, res) => res.type("text/plain").send("ok"));
+
+app.get("/metrics", async (_req, res) => {
   try {
-    const url = new URL(req.url, "http://localhost");
-
-    if (req.method === "GET" && url.pathname === "/healthz") {
-      res.writeHead(200, { "content-type": "text/plain" });
-      res.end("ok");
-      return;
-    }
-
-    if ((req.method === "GET" || req.method === "POST") && url.pathname === "/run-now") {
-      const body = await readJsonBody(req);
-      const sessionRaw = (
-        url.searchParams.get("session") ??
-        body?.session ??
-        ""
-      )
-        .toString()
-        .toLowerCase();
-      const session =
-        sessionRaw === "open" || sessionRaw === "closed" ? sessionRaw : "unknown";
-
-      const noopRaw = (
-        url.searchParams.get("noop") ??
-        body?.noop ??
-        ""
-      )
-        .toString()
-        .toLowerCase();
-      const noop = ["1", "true", "yes", "on"].includes(noopRaw);
-
-      console.log("[run-now] received", { session, noop });
-
-      runOnce({ session, noop })
-        .then(() => console.log("[run-now] completed", { session, noop }))
-        .catch((e) => console.error("[run-now] error", e));
-
-      json(res, 200, {
-        ok: true,
-        accepted: true,
-        session,
-        noop,
-        ts: new Date().toISOString(),
-      });
-      return;
-    }
-
-    if (req.method === "GET" && url.pathname === "/metrics") {
-      try {
-        res.setHeader("Content-Type", promClient.register.contentType);
-        res.end(await promClient.register.metrics());
-      } catch (e) {
-        res.writeHead(500, { "content-type": "text/plain" });
-        res.end(`# metrics error\n${e?.message || e}`);
-      }
-      return;
-    }
-
-    json(res, 404, { error: "not_found" });
+    res.set("Content-Type", promClient.register.contentType);
+    res.send(await promClient.register.metrics());
   } catch (e) {
-    console.error("[server] error", e);
-    json(res, 500, { error: "internal_error" });
+    res.status(500).send(`# metrics error\n${e?.message || e}`);
   }
 });
 
-(async () => {
-  const m = await workerModPromise;
-  if (m?.main) {
-    runOnce();
-    setInterval(runOnce, EVERY);
-  } else {
-    console.warn("[diag] worker module not available yet");
-  }
-})();
+app.post("/run-now", (req, res) => {
+  const sessionRaw = (
+    req.query.session ?? req.body?.session ?? ""
+  )
+    .toString()
+    .toLowerCase();
+  const session = sessionRaw === "open" || sessionRaw === "closed" ? sessionRaw : "unknown";
 
-server.listen(PORT, "0.0.0.0", () => log("[diag] web listening", { PORT }));
+  const noopRaw = (
+    req.query.noop ?? req.body?.noop ?? ""
+  )
+    .toString()
+    .toLowerCase();
+  const noop = ["1", "true", "yes", "on"].includes(noopRaw);
+
+  console.log("[run-now] received", { session, noop });
+
+  res.json({ ok: true, accepted: true, session, noop, ts: new Date().toISOString() });
+
+  queueMicrotask(() => {
+    runOnce({ session, noop, reason: "manual" })
+      .then(() => console.log("[run-now] completed", { session, noop }))
+      .catch((e) => console.error("[run-now] error", e));
+  });
+});
+
+const EVERY = Number(process.env.WORKER_EVERY_MS) || 60000;
+const PORT = Number(process.env.PORT) || 8080;
+
+void runOnce();
+setInterval(() => {
+  void runOnce();
+}, EVERY);
+
+app.listen(PORT, "0.0.0.0", () => {
+  log("[diag] web listening", { PORT });
+});
