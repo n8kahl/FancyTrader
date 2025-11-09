@@ -5,6 +5,7 @@ import cors from "cors";
 import helmet from "helmet";
 import { healthRouter } from "./routes/health.js";
 import { setupRoutes } from "./routes/index.js";
+import { snapshotsRouter } from "./routes/snapshots.js";
 import { incHttp, register } from "./utils/metrics.js";
 import { logger } from "./utils/logger.js";
 import { SupabaseService } from "./services/supabaseService.js";
@@ -209,6 +210,7 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
 
   app.use("/api/alerts", alertLimiter);
   app.use("/api/share", shareLimiter);
+  app.use("/api/snapshots", snapshotsRouter);
   setupRoutes(app, services);
 
   app.use(errorHandler);

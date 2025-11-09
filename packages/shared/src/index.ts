@@ -23,5 +23,7 @@ export type { AlertCondition, WSInbound, WSOutbound, ServiceState } from "./sche
 export * from "./client/contracts";
 export * from "./client/ws";
 export * from "./client/massive";
+// Re-export Massive snapshot helpers so runtime can import from the built package.
+export * from "./massive/snapshots";
 
 export * from "./contracts/strategy";

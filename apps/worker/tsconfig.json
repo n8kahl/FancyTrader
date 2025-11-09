@@ -6,6 +6,6 @@
     "types": ["node"],
     "isolatedModules": true
   },
-  "include": ["src", "tests"],
+  "include": ["src", "tests", "test"],
   "exclude": ["dist", "node_modules"]
 }
