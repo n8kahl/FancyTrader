@@ -1,77 +1,82 @@
-import express from "express";
-import pino from "pino";
+import http from "node:http";
+import { URL } from "node:url";
 
-const log = pino({ level: process.env.LOG_LEVEL || "info" });
-const app = express();
-app.use(express.json());
+const log = (...a) => console.log(...a);
 
-let workerModPromise = import("./dist/index.js").catch((e) => {
-  log.error({ err: e }, "[diag] import failed");
+const workerModPromise = import("./dist/index.js").catch((e) => {
+  console.error("[diag] import failed", e);
   return null;
 });
 
 const EVERY = +process.env.WORKER_EVERY_MS || 60_000;
 const PORT = +(process.env.PORT || 8080);
 
-app.get("/healthz", (_, res) => {
-  res.type("text/plain").send("ok");
-});
+function json(res, code, obj) {
+  const body = JSON.stringify(obj);
+  res.writeHead(code, {
+    "content-type": "application/json",
+    "content-length": Buffer.byteLength(body),
+  });
+  res.end(body);
+}
 
-app.get("/metrics", async (req, res) => {
+const server = http.createServer(async (req, res) => {
   try {
-    const m = await workerModPromise;
-    if (m?.metrics?.expose) {
-      const text = await m.metrics.expose();
-      res.type("text/plain").send(text);
-    } else {
-      res.status(404).type("text/plain").send("# no metrics");
-    }
-  } catch (e) {
-    res.status(500).type("text/plain").send(`# metrics error: ${String(e)}`);
-  }
-});
+    const url = new URL(req.url, "http://localhost");
 
-app.post("/run-now", async (req, res) => {
-  const session = (req.query.session || req.body?.session || "").toString() || undefined;
-  res.json({ ok: true, accepted: true, session: session || null, ts: new Date().toISOString() });
-
-  try {
-    const m = await workerModPromise;
-    if (!m?.main) {
-      log.error("[run-now] worker module not ready");
+    if (req.method === "GET" && url.pathname === "/healthz") {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.end("ok");
       return;
     }
-    Promise.resolve(m.main({ forceSession: session }))
-      .then(() => log.info("[run-now] main() returned"))
-      .catch((e) => log.error({ err: e }, "[run-now] main() failed"));
-  } catch (e) {
-    log.error({ err: e }, "[run-now] failed to start");
-  }
-});
 
-app.get("/run-now", (req, res) => {
-  req.method = "POST";
-  app._router.handle(req, res);
+    if ((req.method === "GET" || req.method === "POST") && url.pathname === "/run-now") {
+      const session = url.searchParams.get("session") || null;
+      json(res, 200, { ok: true, accepted: true, session, ts: new Date().toISOString() });
+
+      const m = await workerModPromise;
+      if (!m?.main) {
+        console.error("[run-now] worker module not ready");
+        return;
+      }
+      Promise.resolve(m.main({ forceSession: session || undefined }))
+        .then(() => log("[run-now] main() returned"))
+        .catch((e) => console.error("[run-now] main() failed", e));
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/metrics") {
+      const m = await workerModPromise;
+      if (m?.metrics?.expose) {
+        const text = await m.metrics.expose();
+        res.writeHead(200, { "content-type": "text/plain" });
+        res.end(text);
+      } else {
+        res.writeHead(404, { "content-type": "text/plain" });
+        res.end("# no metrics");
+      }
+      return;
+    }
+
+    json(res, 404, { error: "not_found" });
+  } catch (e) {
+    console.error("[server] error", e);
+    json(res, 500, { error: "internal_error" });
+  }
 });
 
 (async () => {
-  try {
-    const m = await workerModPromise;
-    if (!m?.main) {
-      log.warn("[diag] worker module not available yet");
-    } else {
-      const run = () =>
-        Promise.resolve(m.main())
-          .then(() => log.info("[diag] main() returned"))
-          .catch((e) => log.error({ err: e }, "[diag] main() failed"));
-      run();
-      setInterval(run, EVERY);
-    }
-  } catch (e) {
-    log.error({ err: e }, "[diag] boot loop failed");
+  const m = await workerModPromise;
+  if (m?.main) {
+    const run = () =>
+      Promise.resolve(m.main())
+        .then(() => log("[diag] main() returned"))
+        .catch((e) => console.error("[diag] main() failed", e));
+    run();
+    setInterval(run, EVERY);
+  } else {
+    console.warn("[diag] worker module not available yet");
   }
 })();
 
-app.listen(PORT, "0.0.0.0", () => {
-  log.info(`[diag] web health listening on ${PORT}`);
-});
+server.listen(PORT, "0.0.0.0", () => log(`[diag] web health listening on ${PORT}`));

@@ -1,26 +1,6 @@
 {
-  "name": "@fancytrader/worker",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index.js",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "start:loop": "node start.mjs"
   },
-  "dependencies": {
-    "@fancytrader/shared": "workspace:*",
-    "@supabase/supabase-js": "^2.49.8",
-    "axios": "^1.7.2",
-    "prom-client": "^15.1.2"
-  },
-  "devDependencies": {
-    "ts-node": "^10.9.2",
-    "tsx": "^4.19.0",
-    "typescript": "5.6.3",
-    "vitest": "2.1.4"
-  }
+  "type": "module"
 }
