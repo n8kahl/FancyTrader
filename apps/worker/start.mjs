@@ -44,6 +44,23 @@ try {
       const { createClient } = await import("@supabase/supabase-js");
       const url = process.env.SUPABASE_URL;
       const key = process.env.SUPABASE_SERVICE_KEY;
+      let session = "unknown";
+      try {
+        const base = process.env.MASSIVE_BASE_URL || "https://api.massive.com";
+        const resp = await fetch(`${base}/v1/market/status`, {
+          headers: {
+            Authorization: `Bearer ${process.env.MASSIVE_API_KEY}`,
+          },
+        });
+        if (resp.ok) {
+          const j = await resp.json();
+          session = j?.session || j?.status || "unknown";
+        } else {
+          console.warn("[heartbeat] status fetch non-200", resp.status);
+        }
+      } catch (e) {
+        console.warn("[heartbeat] status fetch failed", e?.message || e);
+      }
       if (url && key) {
         const sb = createClient(url, key, { auth: { persistSession: false } });
         const now = new Date().toISOString();
@@ -51,7 +68,7 @@ try {
           job_name: "heartbeat_worker",
           window_start: now,
           status: "success",
-          meta: { source: "start.mjs", note: "post-main heartbeat" },
+          meta: { source: "start.mjs", note: "post-main heartbeat", session },
         };
         const { error } = await sb.from("scan_jobs").upsert(row, { onConflict: "job_name,window_start" });
         if (error) console.error("[heartbeat] upsert FAIL", error.message);
