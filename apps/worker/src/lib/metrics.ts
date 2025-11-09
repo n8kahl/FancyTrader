@@ -28,11 +28,44 @@ export const scanLatency = new Histogram({
   registers: [registry],
 });
 
-export function startMetricsServer(port: number) {
-  const server = http.createServer(async (_req, res) => {
+let server: http.Server | null = null;
+
+export function startMetricsServer(port: number): http.Server | null {
+  if (!port || port <= 0) {
+    return null;
+  }
+  if (server) {
+    return server;
+  }
+
+  const handler = async (_req: http.IncomingMessage, res: http.ServerResponse) => {
     res.setHeader("Content-Type", registry.contentType);
     res.end(await registry.metrics());
+  };
+
+  const s = http.createServer(handler);
+  s.on("error", (err: any) => {
+    if (err?.code === "EADDRINUSE") {
+      console.warn("[metrics] port in use, assuming already started on", port);
+      server = s;
+      return;
+    }
+    console.error("[metrics] server error:", err?.message || err);
   });
-  server.listen(port, "0.0.0.0");
+
+  try {
+    s.listen(port, "0.0.0.0", () => {
+      console.log("[metrics] listening on", port);
+    });
+    server = s;
+  } catch (e: any) {
+    if (e?.code === "EADDRINUSE") {
+      console.warn("[metrics] port already in use on first listen; keeping existing server");
+      server = s;
+      return server;
+    }
+    console.error("[metrics] failed to listen:", e?.message || e);
+  }
+
   return server;
 }
