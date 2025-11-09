@@ -53,7 +53,31 @@ function json(res, code, obj) {
   res.end(body);
 }
 
-const run = async (ctx = {}) => {
+async function readJsonBody(req) {
+  if (req.method !== "POST") {
+    return null;
+  }
+  return new Promise((resolve) => {
+    let data = "";
+    req.on("data", (chunk) => {
+      data += chunk;
+    });
+    req.on("end", () => {
+      if (!data) {
+        resolve(null);
+        return;
+      }
+      try {
+        resolve(JSON.parse(data));
+      } catch {
+        resolve(null);
+      }
+    });
+    req.on("error", () => resolve(null));
+  });
+}
+
+const runOnce = async (ctx = {}) => {
   const m = await workerModPromise;
   if (!m?.main) {
     console.error("[metrics] run skipped -- worker module not ready");
@@ -91,17 +115,31 @@ const server = http.createServer(async (req, res) => {
     }
 
     if ((req.method === "GET" || req.method === "POST") && url.pathname === "/run-now") {
-      const rawSession = String(url.searchParams.get("session") ?? "").toLowerCase();
-      const normalizedSession =
-        rawSession === "open" || rawSession === "closed" ? rawSession : null;
-      const session = normalizedSession ?? "unknown";
+      const body = await readJsonBody(req);
+      const sessionRaw = (
+        url.searchParams.get("session") ??
+        body?.session ??
+        ""
+      )
+        .toString()
+        .toLowerCase();
+      const session =
+        sessionRaw === "open" || sessionRaw === "closed" ? sessionRaw : "unknown";
 
-      const rawNoop = String(url.searchParams.get("noop") ?? "").toLowerCase();
-      const noop =
-        rawNoop === "true" ||
-        rawNoop === "1" ||
-        rawNoop === "yes" ||
-        rawNoop === "y";
+      const noopRaw = (
+        url.searchParams.get("noop") ??
+        body?.noop ??
+        ""
+      )
+        .toString()
+        .toLowerCase();
+      const noop = ["1", "true", "yes", "on"].includes(noopRaw);
+
+      console.log("[run-now] received", { session, noop });
+
+      runOnce({ session, noop })
+        .then(() => console.log("[run-now] completed", { session, noop }))
+        .catch((e) => console.error("[run-now] error", e));
 
       json(res, 200, {
         ok: true,
@@ -110,12 +148,6 @@ const server = http.createServer(async (req, res) => {
         noop,
         ts: new Date().toISOString(),
       });
-
-      const runCtx = { session, noop };
-      if (normalizedSession) {
-        runCtx.forceSession = normalizedSession;
-      }
-      void run(runCtx);
       return;
     }
 
@@ -140,8 +172,8 @@ const server = http.createServer(async (req, res) => {
 (async () => {
   const m = await workerModPromise;
   if (m?.main) {
-    run();
-    setInterval(run, EVERY);
+    runOnce();
+    setInterval(runOnce, EVERY);
   } else {
     console.warn("[diag] worker module not available yet");
   }
