@@ -3,19 +3,16 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "types": [
-      "node",
-      "jest"
-    ],
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"],
     "isolatedModules": true
   },
-  "include": [
-    "src",
-    "test"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "src/__tests__"
-  ]
+  "include": ["src", "test"],
+  "exclude": ["node_modules", "dist", "src/__tests__"]
 }
