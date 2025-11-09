@@ -1,55 +1,36 @@
 import { Express } from "express";
+import { MassiveClient, marketToMode } from "@fancytrader/shared";
 import { PolygonClient } from "../services/polygonClient.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { aggQuerySchema, symbolParamSchema, cursorContractsQuerySchema } from "../validation/schemas.js";
 import { badRequest, internalError } from "../utils/httpError.js";
 
+const massive = new MassiveClient();
 const polygonClient = new PolygonClient();
 
-type NormalizedSession = "premarket" | "regular" | "aftermarket" | "closed";
-
-const SESSION_HINTS: Record<NormalizedSession, (val?: string) => boolean> = {
-  premarket: (val) => Boolean(val?.includes("pre")),
-  regular: (val) => Boolean(val?.includes("open")),
-  aftermarket: (val) => Boolean(val?.includes("after") || val?.includes("post")),
-  closed: () => false,
-};
-
-export function normalizeMarketSession(rawResponse: unknown) {
-  const raw =
-    typeof rawResponse === "object" && rawResponse !== null
-      ? (rawResponse as Record<string, unknown>)
-      : {};
-  const marketText = String(
-    raw.market ??
-      raw.market_state ??
-      raw.session ??
-      (typeof raw.is_open === "boolean" ? (raw.is_open ? "open" : "closed") : "")
-  ).toLowerCase();
-
-  let session: NormalizedSession = "closed";
-  if (SESSION_HINTS.premarket(marketText)) {
-    session = "premarket";
-  } else if (SESSION_HINTS.aftermarket(marketText)) {
-    session = "aftermarket";
-  } else if (SESSION_HINTS.regular(marketText)) {
-    session = "regular";
-  }
-
-  const pickTimestamp = (...keys: string[]) => {
-    for (const key of keys) {
-      const value = raw[key];
-      if (typeof value === "string" && value.length > 0) {
-        return value;
-      }
+function normalizeMarketSession(rawResponse: unknown) {
+  const raw = typeof rawResponse === "object" && rawResponse !== null ? rawResponse : {};
+  const asTimestamp = (value: unknown): number | null => {
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
+      const parsed = Date.parse(value);
+      return Number.isNaN(parsed) ? null : parsed;
     }
     return null;
   };
-
+  const session = marketToMode(raw);
+  const nextOpen =
+    asTimestamp((raw as any)?.next_open) ??
+    asTimestamp((raw as any)?.nextOpening) ??
+    asTimestamp((raw as any)?.calendar?.next_open);
+  const nextClose =
+    asTimestamp((raw as any)?.next_close) ??
+    asTimestamp((raw as any)?.nextClosing) ??
+    asTimestamp((raw as any)?.calendar?.next_close);
   return {
     session,
-    nextOpen: pickTimestamp("next_open", "next_opening"),
-    nextClose: pickTimestamp("next_close", "next_closing"),
+    nextOpen,
+    nextClose,
     source: "massive" as const,
     raw,
   };
@@ -65,7 +46,7 @@ export function setupMarketDataRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       const { symbol } = symbolParamSchema.parse(req.params);
       const normalizedSymbol = symbol.toUpperCase();
-      const snapshot = await polygonClient.getSnapshot(normalizedSymbol);
+      const snapshot = await massive.getTickerSnapshot(normalizedSymbol);
       res.json({ symbol: normalizedSymbol, data: snapshot });
     })
   );
@@ -127,14 +108,13 @@ export function setupMarketDataRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       const { symbol } = symbolParamSchema.parse(req.params);
       const normalizedSymbol = symbol.toUpperCase();
-      const previousClose = await polygonClient.getPreviousClose(normalizedSymbol);
-
-      if (!previousClose) {
+      const aggs = (await massive.getMinuteAggs(normalizedSymbol, 390)) as any;
+      const results = Array.isArray(aggs?.results) ? aggs.results : [];
+      if (!results.length) {
         res.status(404).json({ error: "Previous close data not found" });
         return;
       }
-
-      res.json({ symbol: normalizedSymbol, data: previousClose });
+      res.json({ symbol: normalizedSymbol, data: results[results.length - 1] });
     })
   );
 
@@ -144,7 +124,7 @@ export function setupMarketDataRoutes(app: Express): void {
   app.get(
     "/api/market/status",
     asyncHandler(async (_req, res) => {
-      const status = await polygonClient.getMarketStatus();
+      const status = await massive.getMarketStatus();
       res.json(normalizeMarketSession(status));
     })
   );

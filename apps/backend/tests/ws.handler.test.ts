@@ -3,7 +3,6 @@ import { EventEmitter } from "events";
 import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
 import { setupWebSocketHandler } from "../src/websocket/handler";
-import type { PolygonStreamingService } from "../src/services/polygonStreamingService";
 import type { StrategyDetectorService } from "../src/services/strategyDetector";
 import { defaultStrategyParams } from "../src/config/strategy.defaults";
 import { logger } from "../src/utils/logger";
@@ -28,7 +27,7 @@ class MockWebSocketServer extends EventEmitter {
 
   simulateConnection(client: MockWebSocket, origin = "http://localhost:5173"): void {
     this.clients.add(client);
-    const req = { headers: { origin } } as unknown as IncomingMessage;
+    const req = { headers: { origin } } as IncomingMessage;
     this.emit("connection", client, req);
   }
 
@@ -48,28 +47,29 @@ class StrategyDetectorStub extends EventEmitter {
   stop = jest.fn();
 }
 
+class MockStreamingService extends EventEmitter {
+  subscribe = jest.fn();
+  unsubscribe = jest.fn();
+  start = jest.fn();
+  stop = jest.fn();
+}
+
 describe("setupWebSocketHandler", () => {
   let wss: MockWebSocketServer;
-  let polygonService: PolygonStreamingService;
   let strategyDetector: StrategyDetectorStub;
+  let streamingService: MockStreamingService;
 
   beforeEach(() => {
     jest.useFakeTimers();
     wss = new MockWebSocketServer();
     strategyDetector = new StrategyDetectorStub();
-    polygonService = {
-      subscribe: jest.fn(),
-      unsubscribe: jest.fn(),
-      connect: jest.fn().mockResolvedValue(undefined),
-      disconnect: jest.fn().mockResolvedValue(undefined),
-      onServiceState: jest.fn().mockReturnValue(() => undefined),
-      getServiceState: jest.fn().mockReturnValue(undefined),
-    } as unknown as PolygonStreamingService;
+    streamingService = new MockStreamingService();
 
-    setupWebSocketHandler(wss as unknown as WebSocketServer, {
-      polygonService,
-      strategyDetector: strategyDetector as unknown as StrategyDetectorService,
-    });
+    setupWebSocketHandler(
+      wss as unknown as WebSocketServer,
+      { strategyDetector: strategyDetector as unknown as StrategyDetectorService },
+      { enableStreaming: false, streamingService }
+    );
   });
 
   afterEach(() => {
@@ -101,7 +101,8 @@ describe("setupWebSocketHandler", () => {
       Buffer.from(JSON.stringify({ type: "SUBSCRIBE", payload: { symbols: ["SPY", "QQQ"] } }))
     );
 
-    expect(polygonService.subscribe).toHaveBeenCalledWith(["SPY", "QQQ"]);
+    expect(streamingService.subscribe).toHaveBeenCalledWith("SPY");
+    expect(streamingService.subscribe).toHaveBeenCalledWith("QQQ");
     const ack = parseLast(clientA);
     expect(ack).not.toBeNull();
     expect(ack).toMatchObject({ type: "SUBSCRIPTIONS", symbols: ["SPY", "QQQ"] });
@@ -112,7 +113,7 @@ describe("setupWebSocketHandler", () => {
       Buffer.from(JSON.stringify({ type: "UNSUBSCRIBE", payload: { symbols: ["QQQ"] } }))
     );
 
-    expect(polygonService.unsubscribe).toHaveBeenCalledWith(["QQQ"]);
+    expect(streamingService.unsubscribe).toHaveBeenCalledWith("QQQ");
   });
 
   it("emits consistent broadcast payloads from strategy events", () => {
@@ -173,7 +174,7 @@ describe("setupWebSocketHandler", () => {
     expect(client.readyState).not.toBe(client.OPEN);
   });
 
-  it("unsubscribes polygon streams when clients disconnect with unique symbols", () => {
+  it("unsubscribes streaming service when clients disconnect with unique symbols", () => {
     const client = new MockWebSocket();
     wss.simulateConnection(client);
     resetPayloads(client);
@@ -184,27 +185,25 @@ describe("setupWebSocketHandler", () => {
     );
 
     client.close();
-    expect(polygonService.unsubscribe).toHaveBeenCalledWith(["AMD"]);
+    expect(streamingService.unsubscribe).toHaveBeenCalledWith("AMD");
   });
 
-  it("logs polygon connection failures without crashing", async () => {
+  it("logs Massive start failures without crashing", () => {
     const failingWss = new MockWebSocketServer();
-    const failingPolygon = {
-      subscribe: jest.fn(),
-      unsubscribe: jest.fn(),
-      connect: jest.fn().mockRejectedValueOnce(new Error("offline")),
-      disconnect: jest.fn(),
-    } as unknown as PolygonStreamingService;
+    const failingService = new MockStreamingService();
+    failingService.start.mockImplementation(() => {
+      throw new Error("offline");
+    });
     const logSpy = jest.spyOn(logger, "error").mockImplementation(() => undefined as never);
 
-    setupWebSocketHandler(failingWss as unknown as WebSocketServer, {
-      polygonService: failingPolygon,
-      strategyDetector: strategyDetector as unknown as StrategyDetectorService,
-    });
+    setupWebSocketHandler(
+      failingWss as unknown as WebSocketServer,
+      { strategyDetector: strategyDetector as unknown as StrategyDetectorService },
+      { enableStreaming: true, streamingService: failingService }
+    );
 
-    await Promise.resolve();
-    expect(failingPolygon.connect).toHaveBeenCalled();
-    expect(logSpy).toHaveBeenCalledWith("Failed to connect to Polygon", { error: expect.any(Error) });
+    expect(failingService.start).toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith("Failed to connect to Massive", { error: expect.any(Error) });
     logSpy.mockRestore();
     failingWss.close();
   });
@@ -220,6 +219,7 @@ describe("setupWebSocketHandler", () => {
     const pong = parseLast(client);
     expect(pong?.type).toBe("PONG");
   });
+
   it("refreshes last activity on pong events", () => {
     const client = new MockWebSocket();
     wss.simulateConnection(client);
@@ -242,10 +242,10 @@ describe("setupWebSocketHandler", () => {
     const payload = Buffer.from(JSON.stringify({ type: "SUBSCRIBE", payload: { symbols: ["MSFT"] } }));
     clientA.emit("message", payload);
     clientB.emit("message", payload);
-    polygonService.unsubscribe = jest.fn();
+    streamingService.unsubscribe.mockReset();
 
     clientA.close();
-    expect(polygonService.unsubscribe).not.toHaveBeenCalledWith(["MSFT"]);
+    expect(streamingService.unsubscribe).not.toHaveBeenCalled();
   });
 
   it("handles socket errors by closing the client", () => {
@@ -258,9 +258,7 @@ describe("setupWebSocketHandler", () => {
   });
 
   it("replays active setups when present", () => {
-    strategyDetector.getActiveSetups = jest.fn().mockReturnValueOnce([
-      { id: "setup-42", symbol: "QQQ" },
-    ]);
+    strategyDetector.getActiveSetups = jest.fn().mockReturnValueOnce([{ id: "setup-42", symbol: "QQQ" }]);
     const client = new MockWebSocket();
     wss.simulateConnection(client);
     const summaries = client.sentPayloads.filter((payload) => JSON.parse(payload).type === "SETUP_UPDATE");
@@ -312,5 +310,4 @@ describe("setupWebSocketHandler", () => {
     const errorPayload = parseLast(client);
     expect(errorPayload?.type).toBe("ERROR");
   });
-
 });

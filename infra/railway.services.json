@@ -1,0 +1,22 @@
+{
+  "services": [
+    {
+      "name": "backend",
+      "env": {
+        "PORT": "3001"
+      },
+      "healthcheckPath": "/healthz",
+      "restartPolicyType": "ON_FAILURE"
+    },
+    {
+      "name": "worker",
+      "env": {
+        "WORKER_EVERY_MS": "60000",
+        "WORKER_SYMBOLS": "SPY,QQQ",
+        "WORKER_METRICS_PORT": "9100"
+      },
+      "cron": "@every 1m",
+      "restartPolicyType": "ON_FAILURE"
+    }
+  ]
+}

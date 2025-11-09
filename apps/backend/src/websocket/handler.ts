@@ -4,11 +4,12 @@ import type { RawData, WebSocket } from "ws";
 import type { ServerOutbound } from "@fancytrader/shared";
 import { z } from "zod";
 import { WSMessage, DetectedSetup } from "../types/index.js";
-import { PolygonStreamingService } from "../services/polygonStreamingService.js";
+import { MassiveStreamingService } from "../services/massiveStreamingService.js";
 import { StrategyDetectorService } from "../services/strategyDetector.js";
 import { logger } from "../utils/logger.js";
 import { onWsConnect, onWsDisconnect } from "../utils/metrics.js";
 import { isAllowedOrigin } from "../security/wsGuard.js";
+import { featureFlags } from "../config/features.js";
 
 interface ClientMeta {
   subscribedSymbols: Set<string>;
@@ -18,12 +19,12 @@ interface ClientMeta {
 const clientMeta = new WeakMap<WebSocket, ClientMeta>();
 
 interface Services {
-  polygonService: PolygonStreamingService;
   strategyDetector: StrategyDetectorService;
 }
 
 interface HandlerOptions {
   enableStreaming?: boolean;
+  streamingService?: MassiveStreamingService;
 }
 
 const subscriptionPayloadSchema = z.object({
@@ -44,26 +45,53 @@ export function setupWebSocketHandler(
   services: Services,
   options: HandlerOptions = {}
 ): void {
-  const { polygonService, strategyDetector } = services;
-  const enableStreaming = options.enableStreaming ?? true;
+  const { strategyDetector } = services;
+  const enableStreaming = options.enableStreaming ?? featureFlags.enableMockStream === false;
+  const streamingService =
+    options.streamingService ??
+    new MassiveStreamingService({
+      baseUrl: process.env.MASSIVE_WS_BASE || "wss://socket.massive.com",
+      apiKey: process.env.MASSIVE_API_KEY || "",
+      cluster: process.env.MASSIVE_WS_CLUSTER || "options",
+    });
 
   if (enableStreaming) {
-    polygonService.connect().catch((err) => {
-      logger.error("Failed to connect to Polygon", { error: err });
-    });
+    try {
+      streamingService.start();
+    } catch (error) {
+      logger.error("Failed to connect to Massive", { error });
+    }
   } else {
-    logger.warn("Polygon streaming disabled; skipping upstream WebSocket connection");
+    logger.warn("Massive streaming disabled; skipping upstream WebSocket connection");
   }
 
-  if (typeof polygonService.onServiceState === "function") {
-    polygonService.onServiceState((state) => {
-      broadcastToAll(wss, {
-        type: "SERVICE_STATE",
-        payload: state,
-        timestamp: state.timestamp ?? Date.now(),
-      });
+  streamingService.on("message", (payload: unknown) => {
+    if (typeof payload === "object" && payload !== null && "type" in payload) {
+      broadcastToAll(wss, payload as WSMessage);
+      return;
+    }
+    broadcastToAll(wss, { type: "STATUS", message: "Upstream activity" });
+  });
+
+  streamingService.on("open", () => {
+    broadcastToAll(wss, {
+      type: "SERVICE_STATE",
+      payload: { status: "connected" },
+      timestamp: Date.now(),
     });
-  }
+  });
+
+  streamingService.on("close", () => {
+    broadcastToAll(wss, {
+      type: "SERVICE_STATE",
+      payload: { status: "disconnected" },
+      timestamp: Date.now(),
+    });
+  });
+
+  streamingService.on("error", (error) => {
+    logger.error("Massive streaming error", { error });
+  });
 
   const heartbeatInterval = setInterval(() => {
     const now = Date.now();
@@ -86,6 +114,7 @@ export function setupWebSocketHandler(
 
   wss.on("close", () => {
     clearInterval(heartbeatInterval);
+    streamingService.stop();
   });
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
@@ -100,18 +129,6 @@ export function setupWebSocketHandler(
     onWsConnect();
 
     clientMeta.set(ws, { subscribedSymbols: new Set(), lastActivity: Date.now() });
-
-    const latestServiceState =
-      typeof polygonService.getServiceState === "function"
-        ? polygonService.getServiceState()
-        : undefined;
-    if (latestServiceState) {
-      sendServerOutbound(ws, {
-        type: "SERVICE_STATE",
-        payload: latestServiceState,
-        timestamp: latestServiceState.timestamp ?? Date.now(),
-      });
-    }
 
     ws.on("pong", () => {
       const meta = clientMeta.get(ws);
@@ -129,7 +146,7 @@ export function setupWebSocketHandler(
       try {
         const raw = JSON.parse(rawDataToString(data));
         const message = inboundSchema.parse(raw);
-        handleClientMessage(ws, message, services);
+        handleClientMessage(ws, message, streamingService);
       } catch (error) {
         logger.error("Error parsing WebSocket message", { error });
         sendError(ws, "Invalid message format");
@@ -153,7 +170,7 @@ export function setupWebSocketHandler(
 
         const toUnsubscribe = symbols.filter((s) => !otherClientsSymbols.has(s));
         if (toUnsubscribe.length > 0) {
-          polygonService.unsubscribe(toUnsubscribe);
+          toUnsubscribe.forEach((symbol) => streamingService.unsubscribe(symbol));
         }
       }
 
@@ -212,15 +229,17 @@ export function setupWebSocketHandler(
   logger.info("WebSocket handler initialized");
 }
 
-function handleClientMessage(ws: WebSocket, message: InboundMessage, services: Services): void {
-  const { polygonService } = services;
-
+function handleClientMessage(
+  ws: WebSocket,
+  message: InboundMessage,
+  streamingService: MassiveStreamingService
+): void {
   switch (message.type) {
     case "SUBSCRIBE":
-      handleSubscribe(ws, message.payload, polygonService);
+      handleSubscribe(ws, message.payload, streamingService);
       break;
     case "UNSUBSCRIBE":
-      handleUnsubscribe(ws, message.payload, polygonService);
+      handleUnsubscribe(ws, message.payload, streamingService);
       break;
     case "PING":
       sendMessage(ws, { type: "PONG", timestamp: Date.now() });
@@ -231,7 +250,7 @@ function handleClientMessage(ws: WebSocket, message: InboundMessage, services: S
 function handleSubscribe(
   ws: WebSocket,
   payload: SubscriptionPayload,
-  polygonService: PolygonStreamingService
+  streamingService: MassiveStreamingService
 ): void {
   const meta = clientMeta.get(ws);
   if (!meta) {
@@ -241,7 +260,7 @@ function handleSubscribe(
 
   const symbols = payload.symbols;
   symbols.forEach((s) => meta.subscribedSymbols.add(s));
-  polygonService.subscribe(symbols);
+  symbols.forEach((symbol) => streamingService.subscribe(symbol));
 
   sendServerOutbound(ws, {
     type: "SUBSCRIPTIONS",
@@ -254,7 +273,7 @@ function handleSubscribe(
 function handleUnsubscribe(
   ws: WebSocket,
   payload: SubscriptionPayload,
-  polygonService: PolygonStreamingService
+  streamingService: MassiveStreamingService
 ): void {
   const meta = clientMeta.get(ws);
   if (!meta) {
@@ -264,7 +283,7 @@ function handleUnsubscribe(
 
   const symbols = payload.symbols;
   symbols.forEach((s) => meta.subscribedSymbols.delete(s));
-  polygonService.unsubscribe(symbols);
+  symbols.forEach((symbol) => streamingService.unsubscribe(symbol));
 
   sendServerOutbound(ws, {
     type: "SUBSCRIPTIONS",

@@ -47,15 +47,14 @@ const broadcastAlert = (payload: AlertBroadcastPayload): void => {
 
 const alertEvaluator = new AlertEvaluator(services.alertRegistry, polygonClient, broadcastAlert);
 
-setupWebSocketHandler(wss, {
-  polygonService: services.polygonService,
-  strategyDetector: services.strategyDetector,
-}, {
-  enableStreaming: streamingEnabled,
-});
+setupWebSocketHandler(
+  wss,
+  { strategyDetector: services.strategyDetector },
+  { enableStreaming: streamingEnabled }
+);
 
 if (!streamingEnabled) {
-  logger.warn("Polygon streaming disabled via STREAMING_ENABLED env");
+  logger.warn("Massive streaming disabled via STREAMING_ENABLED env");
 }
 
 alertEvaluator.start();

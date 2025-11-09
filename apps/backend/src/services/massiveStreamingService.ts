@@ -10,8 +10,7 @@ export type MassiveStreamingOptions = {
   logger?: (event: string, meta?: Record<string, unknown>) => void;
 };
 
-const log = (event: string, meta?: Record<string, unknown>) =>
-  logger.info("massive_ws", { event, ...meta });
+const log = (event: string, meta?: Record<string, unknown>) => logger.info("massive_ws", { event, ...meta });
 
 export class MassiveStreamingService extends EventEmitter {
   private ws?: WebSocket;
@@ -24,6 +23,9 @@ export class MassiveStreamingService extends EventEmitter {
 
   constructor(private readonly options: MassiveStreamingOptions) {
     super();
+    if (!options.apiKey) {
+      throw new Error("MASSIVE_API_KEY is required for streaming service");
+    }
     this.subs = options.subscriptions ?? [];
     this.logFn = options.logger ?? ((event, meta) => log(event, meta));
   }
@@ -41,8 +43,7 @@ export class MassiveStreamingService extends EventEmitter {
   }
 
   subscribe(channel: string): void {
-    if (this.subs.includes(channel)) return;
-    this.subs.push(channel);
+    if (!this.subs.includes(channel)) this.subs.push(channel);
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.send({ action: "subscribe", params: channel });
     }
@@ -57,24 +58,26 @@ export class MassiveStreamingService extends EventEmitter {
 
   updateSubscriptions(subs: string[]): void {
     this.subs = subs;
-    if (this.ws?.readyState === WebSocket.OPEN && subs.length) {
+    if (this.ws?.readyState === WebSocket.OPEN && subs.length > 0) {
       this.send({ action: "subscribe", params: subs.join(",") });
     }
   }
 
   private connect(): void {
-    const url = `${this.options.baseUrl}/${this.options.cluster ?? "options"}?apiKey=${this.options.apiKey}`;
-    this.logger("ws_connecting", { url });
+    const baseUrl = this.options.baseUrl.replace(/\/+$/, "");
+    const cluster = this.options.cluster ?? "options";
+    const url = `${baseUrl}/${cluster}?apiKey=${this.options.apiKey}`;
+    this.logFn("ws_connecting", { url });
     this.ws = new WebSocket(url);
 
     this.ws.on("open", () => this.handleOpen(url));
     this.ws.on("message", (buf) => this.handleMessage(buf));
     this.ws.on("close", (code) => this.handleClose(code));
-    this.ws.on("error", (error) => this.handleError(error as Error));
+    this.ws.on("error", (err) => this.handleError(err as Error));
   }
 
   private handleOpen(url: string): void {
-    this.logger("ws_open", { url });
+    this.logFn("ws_open", { url });
     this.backoff = 250;
     this.flushSubscriptions();
     this.startHeartbeat();
@@ -84,30 +87,29 @@ export class MassiveStreamingService extends EventEmitter {
   private handleMessage(buffer: WebSocket.RawData): void {
     try {
       const msg = JSON.parse(buffer.toString());
-      if (msg.action === "pong") {
+      if (msg?.action === "pong") {
         this.touchHeartbeat();
         return;
       }
       this.emit("message", msg);
     } catch (error) {
-      this.logger("ws_parse_error", { error: error instanceof Error ? error.message : String(error) });
+      this.logFn("ws_message_parse_error", { error: String(error) });
     }
   }
 
-  private handleClose(code?: number): void {
-    this.logger("ws_close", { code });
+  private handleClose(code: number): void {
+    this.logFn("ws_close", { code });
     if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.heartbeatTimeout) clearTimeout(this.heartbeatTimeout);
-
+    this.ws = undefined;
+    this.emit("close", code);
     if (!this.closedByUser) {
       this.scheduleReconnect();
     }
-
-    this.emit("close", code);
   }
 
   private handleError(error: Error): void {
-    this.logger("ws_error", { error: error.message });
+    this.logFn("ws_error", { error: error.message });
     this.emit("error", error);
   }
 
@@ -121,50 +123,50 @@ export class MassiveStreamingService extends EventEmitter {
     if (this.heartbeatTimeout) clearTimeout(this.heartbeatTimeout);
 
     const ping = () => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.send({ action: "ping" });
-        this.scheduleHeartbeatTimeout();
-      }
+      if (this.ws?.readyState !== WebSocket.OPEN) return;
+      this.send({ action: "ping" });
+      this.scheduleHeartbeatTimeout();
     };
 
     ping();
-    this.heartbeat = setInterval(ping, 20_000);
+    this.heartbeat = setInterval(ping, 15_000);
   }
 
   private touchHeartbeat(): void {
     if (this.heartbeatTimeout) {
       clearTimeout(this.heartbeatTimeout);
-      this.scheduleHeartbeatTimeout();
+      this.heartbeatTimeout = undefined;
     }
   }
 
   private scheduleHeartbeatTimeout(): void {
     if (this.heartbeatTimeout) clearTimeout(this.heartbeatTimeout);
     this.heartbeatTimeout = setTimeout(() => {
-      this.logger("ws_heartbeat_missed");
-      this.ws?.terminate();
-    }, 45_000);
+      this.logFn("ws_heartbeat_missed");
+      try {
+        this.ws?.terminate();
+      } catch {
+        /* ignore */
+      }
+    }, 10_000);
   }
 
   private scheduleReconnect(): void {
     const jitter = Math.random() * 100;
-    const wait = Math.min(this.backoff + jitter, 5000);
-    this.logger("ws_reconnect_scheduled", { wait });
+    const wait = Math.min(this.backoff + jitter, 5_000);
+    this.logFn("ws_reconnect_scheduled", { wait });
     setTimeout(() => {
-      this.backoff = Math.min(this.backoff * 2, 5000);
+      this.backoff = Math.min(this.backoff * 2, 5_000);
       this.connect();
     }, wait);
   }
 
   private send(payload: Record<string, unknown>): void {
+    if (this.ws?.readyState !== WebSocket.OPEN) return;
     try {
-      this.ws?.send(JSON.stringify(payload));
+      this.ws.send(JSON.stringify(payload));
     } catch (error) {
-      logger.warn("Failed to send WS payload", { error: error instanceof Error ? error.message : String(error) });
+      this.logFn("ws_send_error", { error: String(error) });
     }
-  }
-
-  private logger(event: string, meta?: Record<string, unknown>): void {
-    this.logFn(event, meta);
   }
 }

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { SessionIndicator } from "../SessionIndicator";
 import { apiClient } from "../../services/apiClient";
 
@@ -9,29 +9,37 @@ describe("SessionIndicator", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders regular session chip", async () => {
-    const spy = vi
+  it("renders and polls status", async () => {
+    const getMarketStatus = vi
       .spyOn(apiClient, "getMarketStatus")
-      .mockResolvedValue({ session: "regular", nextOpen: null, nextClose: null, source: "massive" });
+      .mockResolvedValue({
+        session: "regular",
+        nextOpen: null,
+        nextClose: null,
+        source: "backend",
+      });
 
     render(<SessionIndicator />);
 
-    const indicator = await screen.findByLabelText("session-indicator");
-    expect(indicator.textContent?.replace(/\s+/g, "")).toContain("Session:Regular");
-    expect(spy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Session: Regular/i)).toBeInTheDocument();
+    });
+    expect(getMarketStatus).toHaveBeenCalled();
   });
 
-  it("shows mock label when mock mode enabled", () => {
-    const spy = vi.spyOn(apiClient, "getMarketStatus").mockResolvedValue({
-      session: "regular",
-      nextOpen: null,
-      nextClose: null,
-      source: "massive",
-    });
+  it("respects mock mode", () => {
+    const getMarketStatus = vi
+      .spyOn(apiClient, "getMarketStatus")
+      .mockResolvedValue({
+        session: "premarket",
+        nextOpen: null,
+        nextClose: null,
+        source: "backend",
+      });
 
     render(<SessionIndicator mock />);
-    const indicator = screen.getByLabelText("session-indicator");
-    expect(indicator.textContent?.replace(/\s+/g, "")).toContain("Session:Mock");
-    expect(spy).not.toHaveBeenCalled();
+
+    expect(screen.getByLabelText(/Session: Mock/i)).toBeInTheDocument();
+    expect(getMarketStatus).not.toHaveBeenCalled();
   });
 });

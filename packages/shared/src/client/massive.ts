@@ -1,4 +1,4 @@
-import axios, { type AxiosInstance } from "axios";
+import axios, { AxiosError, type AxiosInstance } from "axios";
 
 export type MarketMode = "premarket" | "regular" | "aftermarket" | "closed";
 
@@ -9,155 +9,141 @@ export interface MassiveClientOptions {
   maxRetries?: number;
 }
 
+const DEFAULT_TIMEOUT = 10_000;
+const DEFAULT_MAX_RETRIES = 5;
+
+function isRetryableStatus(status?: number): boolean {
+  if (!status) return false;
+  if (status === 429) return true;
+  return status >= 500 && status < 600;
+}
+
+function computeRetryAfter(error: AxiosError): number | undefined {
+  const header = error.response?.headers?.["retry-after"];
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return seconds * 1000;
+  return undefined;
+}
+
+function backoffWithJitter(baseMs: number): number {
+  return baseMs + Math.random() * baseMs;
+}
+
 export class MassiveClient {
   private readonly http: AxiosInstance;
   private readonly maxRetries: number;
+  private breakerState: "closed" | "open" | "half" = "closed";
+  private failures: number[] = [];
 
   constructor(opts: MassiveClientOptions = {}) {
-    const baseURL =
-      opts.baseUrl ||
-      process.env.MASSIVE_BASE_URL ||
-      "https://api.massive.com";
-    const apiKey = opts.apiKey || process.env.MASSIVE_API_KEY || "";
-    const timeout = opts.timeoutMs ?? 10_000;
-    this.maxRetries = Math.max(0, opts.maxRetries ?? 3);
-
+    const baseURL = (opts.baseUrl ?? process.env.MASSIVE_BASE_URL ?? "https://api.massive.com").replace(/\/+$/, "");
+    const apiKey = opts.apiKey ?? process.env.MASSIVE_API_KEY;
+    if (!apiKey) throw new Error("Missing MASSIVE_API_KEY");
     this.http = axios.create({
       baseURL,
-      timeout,
-      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-      // Massive (Polygon) also accepts apiKey as query param; we prefer bearer.
+      timeout: opts.timeoutMs ?? DEFAULT_TIMEOUT,
+      headers: {
+        "user-agent": process.env.HTTP_USER_AGENT ?? "FancyTrader/1.0",
+      },
+      params: { apiKey },
     });
+    this.maxRetries = Math.max(0, opts.maxRetries ?? DEFAULT_MAX_RETRIES);
   }
 
-  private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
-    let attempt = 0;
-    while (true) {
-      try {
-        return await fn();
-      } catch (error) {
-        if (attempt >= this.maxRetries) throw error;
-        const delay = Math.min(1000 * 2 ** attempt, 8000) + Math.random() * 250;
-        await new Promise((r) => setTimeout(r, delay));
-        attempt++;
-      }
+  private noteFailure(now = Date.now()) {
+    this.failures.push(now);
+    if (this.failures.length > 20) this.failures.shift();
+    const recent = this.failures.filter((ts) => ts >= now - 30_000).length;
+    if (recent >= 5 && this.breakerState === "closed") {
+      this.breakerState = "open";
+      setTimeout(() => {
+        this.breakerState = "half";
+      }, 30_000);
     }
   }
 
-  // Market status (unchanged)
+  private noteSuccess() {
+    if (this.breakerState !== "closed") {
+      this.breakerState = "closed";
+      this.failures = [];
+    }
+  }
+
+  private async retrying<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.breakerState === "open") throw new Error("CircuitOpen");
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        const result = await fn();
+        this.noteSuccess();
+        return result;
+      } catch (error) {
+        const axiosError = error as AxiosError;
+        const status = axiosError.response?.status;
+        if (!isRetryableStatus(status) || attempt === this.maxRetries) {
+          this.noteFailure();
+          throw error;
+        }
+        const retryAfterMs = computeRetryAfter(axiosError);
+        const baseDelay = retryAfterMs ?? 200 * 2 ** attempt;
+        const wait = Math.min(backoffWithJitter(baseDelay), 3000);
+        await new Promise((resolve) => setTimeout(resolve, wait));
+      }
+    }
+    throw new Error("RetryAttemptsExceeded");
+  }
+
   async getMarketStatus(): Promise<{ market: string; [k: string]: unknown }> {
-    return this.withRetry(async () => {
+    return this.retrying(async () => {
       const { data } = await this.http.get("/v1/marketstatus/now");
       return data ?? {};
     });
   }
 
-  // ---------- INDICES ----------
-  // Example symbols: "I:SPX", "I:NDX", "I:VIX"
-  async getIndexSnapshot(indexSymbol: string): Promise<unknown> {
-    return this.withRetry(async () => {
+  async getTickerSnapshot(symbol: string): Promise<unknown> {
+    return this.retrying(async () => {
       const { data } = await this.http.get(
-        `/v2/snapshot/locale/us/markets/indices/tickers/${encodeURIComponent(indexSymbol)}`
+        `/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(symbol)}`
       );
-      // Polygon snapshot shape returns { ticker: {...} }
       return data?.ticker ?? data ?? {};
     });
   }
 
-  // Minute aggregates for indices/ETFs/underlyings
-  async getMinuteAggs(symbol: string, minutes = 30): Promise<unknown[]> {
-    return this.withRetry(async () => {
-      const to = new Date();
-      const from = new Date(to.getTime() - minutes * 60_000);
-      const path = `/v2/aggs/ticker/${encodeURIComponent(
-        symbol
-      )}/range/1/minute/${from.toISOString()}/${to.toISOString()}`;
-      const { data } = await this.http.get(path, {
-        params: { adjusted: true, sort: "asc", limit: 50000 },
-      });
-      return Array.isArray(data?.results) ? data.results : [];
-    });
-  }
-
-  // ---------- OPTIONS ----------
-  // Full options contracts listings (reference)
-  async getOptionsContracts(params: {
-    underlying: string;
-    expiration?: string;
-    type?: "call" | "put";
-    strike?: number;
-    limit?: number;
-  }): Promise<unknown> {
-    return this.withRetry(async () => {
-      const { underlying, expiration, type, strike, limit = 250 } = params;
+  async getMinuteAggs(symbol: string, minutes = 30): Promise<unknown> {
+    const to = new Date();
+    const from = new Date(to.getTime() - minutes * 60_000);
+    return this.retrying(async () => {
       const { data } = await this.http.get(
-        "/v3/reference/options/contracts",
-        {
-          params: {
-            underlying_ticker: underlying,
-            expiration_date: expiration,
-            contract_type: type,
-            strike_price: strike,
-            limit,
-          },
-        }
+        `/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/1/minute/${from.getTime()}/${to.getTime()}`,
+        { params: { sort: "asc", limit: 5000 } }
       );
       return data ?? {};
     });
   }
 
-  // Per-option live snapshot
-  async getOptionSnapshot(underlying: string, optionSymbol: string): Promise<unknown> {
-    return this.withRetry(async () => {
+  async getOptionSnapshot(underlying: string, contract: string): Promise<unknown> {
+    return this.retrying(async () => {
       const { data } = await this.http.get(
-        `/v3/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(optionSymbol)}`
+        `/v3/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(contract)}`
       );
-      return data?.results ?? null;
+      return data ?? {};
     });
   }
 
-  async getTickerSnapshot(symbol: string): Promise<unknown> {
-    return this.withRetry(async () => {
-      if (symbol.startsWith("O:")) {
-        const underlying = symbol.slice(2).replace(/[^A-Z].*$/, "");
-        const { data } = await this.http.get(
-          `/v3/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(symbol)}`
-        );
-        return data?.results ?? {};
-      }
-
-      if (symbol.startsWith("I:")) {
-        const idx = symbol.replace(/^I:/, "");
-        const { data } = await this.http.get(
-          `/v3/snapshot/indices/${encodeURIComponent(idx)}`
-        );
-        return data ?? {};
-      }
-
-      const underlying = symbol.toUpperCase();
-      try {
-        const { data } = await this.http.get(
-          `/v3/snapshot/options/${encodeURIComponent(underlying)}`
-        );
-        return data?.results ?? data ?? {};
-      } catch (err: any) {
-        if (err?.response?.status === 404) {
-          const { data } = await this.http.get(
-            `/v3/snapshot/options/${encodeURIComponent(underlying)}/summary`
-          );
-          return data?.results ?? data ?? {};
-        }
-        throw err;
-      }
+  async getOptionQuote(contract: string): Promise<unknown> {
+    return this.retrying(async () => {
+      const { data } = await this.http.get(`/v3/quotes/${encodeURIComponent(contract)}`);
+      return data ?? {};
     });
   }
 }
 
-// Helpers: mapping market status to our worker mode
-export function marketToMode(raw: any): MarketMode {
-  const market = String(raw?.market ?? "").toLowerCase();
-  if (market.includes("pre")) return "premarket";
-  if (market.includes("after")) return "aftermarket";
-  if (market.includes("open") || market.includes("regular")) return "regular";
+export function marketToMode(raw: unknown): MarketMode {
+  type MarketPayload = { market?: string; status?: string };
+  const payload = typeof raw === "object" && raw !== null ? (raw as MarketPayload) : undefined;
+  const text = String(payload?.market ?? payload?.status ?? "").toLowerCase();
+  if (text.includes("pre")) return "premarket";
+  if (text.includes("after") || text.includes("post")) return "aftermarket";
+  if (text.includes("open") || text.includes("regular")) return "regular";
   return "closed";
 }

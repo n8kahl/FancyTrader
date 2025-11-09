@@ -1,80 +1,44 @@
-import axios, { AxiosError } from "axios";
+import axios, { type AxiosError } from "axios";
 
-const V3 = "https://api.massive.com/v3";
-const V2 = "https://api.massive.com/v2";
-const API_KEY = process.env.MASSIVE_API_KEY!;
+const BASE_URL = (process.env.MASSIVE_BASE_URL ?? "https://api.massive.com").replace(/\/+$/, "");
+const V3 = `${BASE_URL}/v3`;
+const V2 = `${BASE_URL}/v2`;
+const API_KEY = process.env.MASSIVE_API_KEY;
 if (!API_KEY) throw new Error("MASSIVE_API_KEY is required");
 
-function logHttpError(e: unknown) {
-  if (axios.isAxiosError(e)) {
-    const err = e as AxiosError<any>;
-    const base = err.config?.baseURL ?? "";
-    const urlPath = err.config?.url ?? "";
-    const params = err.config?.params ? `?${new URLSearchParams(err.config.params as any)}` : "";
-    console.error(`[HTTP ${err.response?.status ?? "ERR"}] ${base}${urlPath}${params}`);
+function logHttpError(error: unknown) {
+  if (axios.isAxiosError(error)) {
+    const err = error as AxiosError;
+    const urlPath = `${err.config?.baseURL ?? ""}${err.config?.url ?? ""}`;
+    console.error(`[HTTP ${err.response?.status ?? "ERR"}] ${urlPath}`);
     if (err.response?.data) {
       console.error(JSON.stringify(err.response.data));
     }
-  } else {
-    console.error(e);
+    return;
   }
+  console.error(String(error));
 }
 
-const httpV3 = axios.create({
-  baseURL: V3,
-  params: { apiKey: API_KEY },
-  timeout: 15000,
-});
+const httpV3 = axios.create({ baseURL: V3, params: { apiKey: API_KEY }, timeout: 10_000 });
+const httpV2 = axios.create({ baseURL: V2, params: { apiKey: API_KEY }, timeout: 10_000 });
 
-const httpV2 = axios.create({
-  baseURL: V2,
-  params: { apiKey: API_KEY },
-  timeout: 15000,
-});
-
-export async function snapshotIndices(tickers: string[]) {
+export async function snapshotIndices(symbols: string[]) {
   try {
-    const { data } = await httpV3.get("/snapshot/indices", {
-      params: { "ticker.any_of": tickers.join(",") },
-    });
+    const { data } = await httpV3.get("/snapshot/indices", { params: { symbols: symbols.join(",") } });
     return data;
-  } catch (e) {
-    logHttpError(e);
-    throw e;
-  }
-}
-
-export async function indexPrevBar(ticker: string) {
-  try {
-    const { data } = await httpV2.get(`/aggs/ticker/${encodeURIComponent(ticker)}/prev`);
-    return data;
-  } catch (e) {
-    logHttpError(e);
-    throw e;
-  }
-}
-
-export async function indexAggsDaily(ticker: string, fromISO: string, toISO: string) {
-  try {
-    const { data } = await httpV2.get(
-      `/aggs/ticker/${encodeURIComponent(ticker)}/range/1/day/${fromISO}/${toISO}`
-    );
-    return data;
-  } catch (e) {
-    logHttpError(e);
-    throw e;
+  } catch (error) {
+    logHttpError(error);
+    throw error;
   }
 }
 
 export async function optionChainSnapshot(underlying: string) {
   try {
-    const { data } = await httpV3.get(
-      `/snapshot/options/${encodeURIComponent(underlying)}`
-    );
+    const { data } = await httpV3.get(`/snapshot/options/${encodeURIComponent(underlying)}`);
     return data;
-  } catch (e) {
-    logHttpError(e);
-    throw e;
+  } catch (error) {
+    logHttpError(error);
+    throw error;
   }
 }
 
@@ -84,9 +48,9 @@ export async function optionContractSnapshot(underlying: string, contract: strin
       `/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(contract)}`
     );
     return data;
-  } catch (e) {
-    logHttpError(e);
-    throw e;
+  } catch (error) {
+    logHttpError(error);
+    throw error;
   }
 }
 
@@ -94,9 +58,19 @@ export async function optionQuote(contract: string) {
   try {
     const { data } = await httpV3.get(`/quotes/${encodeURIComponent(contract)}`);
     return data;
-  } catch (e) {
-    logHttpError(e);
-    throw e;
+  } catch (error) {
+    logHttpError(error);
+    throw error;
+  }
+}
+
+export async function indexPrevBar(symbol: string) {
+  try {
+    const { data } = await httpV2.get(`/aggs/ticker/${encodeURIComponent(symbol)}/prev`);
+    return data;
+  } catch (error) {
+    logHttpError(error);
+    throw error;
   }
 }
 
@@ -115,5 +89,7 @@ export function isExpiredOcc(contract: string, now = new Date()): boolean {
   return exp ? now.getTime() > exp.getTime() + 24 * 3600 * 1000 : false;
 }
 
-export const underlyingFromOcc = (contract: string): string =>
-  (OCC_RE.test(contract) ? contract.match(/^([A-Z]{1,6})\d{6}[CP]\d{8}$/)?.[1] ?? "" : "");
+export function underlyingFromOcc(contract: string): string {
+  if (!OCC_RE.test(contract)) return "";
+  return contract.match(/^([A-Z]{1,6})\d{6}[CP]\d{8}$/)?.[1] ?? "";
+}

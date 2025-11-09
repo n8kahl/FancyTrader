@@ -1,5 +1,6 @@
 import { Express } from "express";
 import { PolygonClient } from "../services/polygonClient.js";
+import { MassiveClient } from "@fancytrader/shared";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {
   optionChainQuerySchema,
@@ -9,6 +10,7 @@ import {
 } from "../validation/schemas.js";
 
 const polygonClient = new PolygonClient();
+const massive = new MassiveClient();
 
 export function setupOptionsRoutes(app: Express): void {
   /**
@@ -43,7 +45,7 @@ export function setupOptionsRoutes(app: Express): void {
     "/api/options/snapshot/:underlying/:optionSymbol",
     asyncHandler(async (req, res) => {
       const { underlying, optionSymbol } = symbolWithOptionParamSchema.parse(req.params);
-      const snapshot = await polygonClient.getOptionsSnapshot(
+      const snapshot = await massive.getOptionSnapshot(
         underlying.toUpperCase(),
         optionSymbol.toUpperCase()
       );
@@ -53,6 +55,15 @@ export function setupOptionsRoutes(app: Express): void {
         optionSymbol: optionSymbol.toUpperCase(),
         data: snapshot,
       });
+    })
+  );
+
+  app.get(
+    "/api/options/quote/:optionSymbol",
+    asyncHandler(async (req, res) => {
+      const { optionSymbol } = symbolWithOptionParamSchema.pick({ optionSymbol: true }).parse(req.params);
+      const quote = await massive.getOptionQuote(optionSymbol.toUpperCase());
+      res.json({ optionSymbol: optionSymbol.toUpperCase(), data: quote });
     })
   );
 

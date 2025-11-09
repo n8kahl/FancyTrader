@@ -14,14 +14,14 @@ const SESSION_HINTS: Record<MarketSession, string> = {
 };
 
 const SESSION_BADGE_STYLES: Record<DisplaySession, string> = {
-  premarket: "bg-blue-500/10 text-blue-300 border-blue-400/30",
-  regular: "bg-green-500/10 text-green-300 border-green-400/40",
-  aftermarket: "bg-purple-500/10 text-purple-300 border-purple-400/30",
-  closed: "bg-slate-500/10 text-slate-300 border-slate-400/30",
-  mock: "bg-orange-500/10 text-orange-300 border-orange-400/30",
+  premarket: "border-amber-500/50 text-amber-700",
+  regular: "border-emerald-500/50 text-emerald-700",
+  aftermarket: "border-cyan-500/50 text-cyan-700",
+  closed: "border-zinc-500/50 text-zinc-600",
+  mock: "border-indigo-500/50 text-indigo-700",
 };
 
-const MOCK_HINT = "Using mock data; session tracking paused";
+const MOCK_HINT = "Mock mode: no live calls";
 
 export interface SessionIndicatorProps {
   mock?: boolean;
@@ -52,13 +52,13 @@ export function SessionIndicator({ mock = false }: SessionIndicatorProps) {
       } catch {
         if (mounted) {
           setSession("closed");
-          setHint("Unable to fetch session data; assuming closed session");
+          setHint(SESSION_HINTS.closed);
         }
       }
     };
 
     load();
-    const id = window.setInterval(load, 15_000);
+    const id = window.setInterval(load, 30_000);
 
     return () => {
       mounted = false;
@@ -79,7 +79,7 @@ export function SessionIndicator({ mock = false }: SessionIndicatorProps) {
         <TooltipTrigger asChild>
           <Badge
             variant="outline"
-            aria-label="session-indicator"
+            aria-label={`Session: ${label}`}
             className={`flex items-center gap-1 px-3 py-1 text-xs font-medium ${SESSION_BADGE_STYLES[session]}`}
           >
             <span className="text-muted-foreground/80">Session:</span>
