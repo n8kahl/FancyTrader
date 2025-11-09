@@ -4,6 +4,24 @@ import * as promClient from "prom-client";
 
 promClient.collectDefaultMetrics();
 
+const scanSuccess = new promClient.Counter({
+  name: "scan_success_total",
+  help: "Total successful scan runs",
+});
+const scanFailure = new promClient.Counter({
+  name: "scan_failure_total",
+  help: "Total failed scan runs",
+});
+const jobsInflight = new promClient.Gauge({
+  name: "jobs_inflight",
+  help: "Number of scan jobs currently executing",
+});
+const scanLatencyMs = new promClient.Histogram({
+  name: "scan_latency_ms",
+  help: "Latency of scan runs in milliseconds",
+  buckets: [50, 100, 250, 500, 1000, 2000, 5000, 10000],
+});
+
 const log = (...a) => console.log(...a);
 
 const workerModPromise = import("./dist/index.js").catch((e) => {
@@ -69,10 +87,21 @@ const server = http.createServer(async (req, res) => {
 (async () => {
   const m = await workerModPromise;
   if (m?.main) {
-    const run = () =>
-      Promise.resolve(m.main())
-        .then(() => log("[diag] main() returned"))
-        .catch((e) => console.error("[diag] main() failed", e));
+    const run = async () => {
+      const endTimer = scanLatencyMs.startTimer();
+      jobsInflight.inc();
+      try {
+        await m.main();
+        scanSuccess.inc();
+        log("[diag] main() returned");
+      } catch (e) {
+        scanFailure.inc();
+        console.error("[metrics] run failed", e);
+      } finally {
+        endTimer();
+        jobsInflight.dec();
+      }
+    };
     run();
     setInterval(run, EVERY);
   } else {
