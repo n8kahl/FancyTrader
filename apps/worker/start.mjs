@@ -47,14 +47,23 @@ try {
       let session = "unknown";
       try {
         const base = process.env.MASSIVE_BASE_URL || "https://api.massive.com";
-        const resp = await fetch(`${base}/v1/market/status`, {
-          headers: {
-            Authorization: `Bearer ${process.env.MASSIVE_API_KEY}`,
-          },
-        });
+        const key = process.env.MASSIVE_API_KEY;
+        const url = `${base}/v1/marketstatus/now`;
+        let resp = await fetch(url, { headers: key ? { Authorization: `Bearer ${key}` } : {} });
+        if ((resp.status === 401 || resp.status === 403) && key) {
+          resp = await fetch(`${url}?apiKey=${encodeURIComponent(key)}`);
+        }
         if (resp.ok) {
           const j = await resp.json();
-          session = j?.session || j?.status || "unknown";
+          session = j?.earlyHours
+            ? "premarket"
+            : j?.afterHours
+            ? "aftermarket"
+            : j?.market === "open"
+            ? "regular"
+            : j?.market === "closed"
+            ? "closed"
+            : "unknown";
         } else {
           console.warn("[heartbeat] status fetch non-200", resp.status);
         }
