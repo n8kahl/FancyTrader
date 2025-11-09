@@ -3,7 +3,7 @@ import type { IncomingMessage } from "http";
 import type { RawData, WebSocket } from "ws";
 import type { ServerOutbound } from "@fancytrader/shared";
 import { z } from "zod";
-import { DetectedSetup } from "../types/index.js";
+import { DetectedSetup, WSMessage } from "../types/index.js";
 import { MassiveStreamingService } from "../services/massiveStreamingService.js";
 import { StrategyDetectorService } from "../services/strategyDetector.js";
 import { logger } from "../utils/logger.js";
@@ -70,7 +70,8 @@ export function setupWebSocketHandler(
       broadcastToAll(wss, payload as ServerOutbound);
       return;
     }
-    broadcastToAll(wss, { type: "status", message: "Upstream activity" });
+    const msg: WSMessage = { type: "status", payload: payload as WSMessage["payload"] };
+    wss.clients.forEach((client) => client.readyState === 1 && client.send(JSON.stringify(msg)));
   });
 
   streamingService.on("open", () => {
