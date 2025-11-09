@@ -28,7 +28,9 @@ const scanLatencyMs = new promClient.Histogram({
   labelNames: ["session", "noop", "result"],
 });
 
-function labels({ session = "unknown", noop = false } = {}) {
+function labels(opts = {}) {
+  const session = opts.session === "open" || opts.session === "closed" ? opts.session : "unknown";
+  const noop = Boolean(opts.noop);
   return { session, noop: String(noop) };
 }
 
