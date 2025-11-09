@@ -183,9 +183,9 @@ export const wsInboundSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("PING"), payload: z.unknown().optional() }),
 ]);
 
-const statusMessageSchema = z.object({ type: z.literal("STATUS"), message: z.string() });
+const statusMessageSchema = z.object({ type: z.literal("status"), message: z.string() });
 const errorMessageSchema = z.object({
-  type: z.literal("ERROR"),
+  type: z.literal("error"),
   message: z.string(),
   code: z.string().optional(),
 });
@@ -200,7 +200,7 @@ const priceUpdateMessageSchema = z.object({
   time: z.number(),
 });
 const alertMessageSchema = z.object({
-  type: z.literal("ALERT"),
+  type: z.literal("alert"),
   id: z.string(),
   symbol: z.string(),
   price: z.number(),

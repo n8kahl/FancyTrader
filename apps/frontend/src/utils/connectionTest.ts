@@ -34,8 +34,8 @@ const snapshotSchema = z.object({
 
 const serverOutboundSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("PRICE_UPDATE"), symbol: z.string(), price: z.number(), time: z.number() }),
-  z.object({ type: z.literal("STATUS"), message: z.string() }),
-  z.object({ type: z.literal("ERROR"), message: z.string(), code: z.string().optional() }),
+  z.object({ type: z.literal("status"), message: z.string() }),
+  z.object({ type: z.literal("error"), message: z.string(), code: z.string().optional() }),
   z.object({ type: z.literal("SUBSCRIPTIONS"), symbols: z.array(z.string()) }),
 ]);
 

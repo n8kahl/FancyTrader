@@ -70,7 +70,7 @@ export function setupWebSocketHandler(
       broadcastToAll(wss, payload as WSMessage);
       return;
     }
-    broadcastToAll(wss, { type: "STATUS", message: "Upstream activity" });
+    broadcastToAll(wss, { type: "status", message: "Upstream activity" });
   });
 
   streamingService.on("open", () => {
@@ -101,7 +101,7 @@ export function setupWebSocketHandler(
       if (!meta) continue;
 
       if (ws.readyState === ws.OPEN) {
-        sendServerOutbound(ws, { type: "STATUS", message: "HEARTBEAT" });
+        sendServerOutbound(ws, { type: "status", message: "HEARTBEAT" });
       }
 
       if (now - meta.lastActivity > 60_000) {
@@ -306,7 +306,7 @@ function sendServerOutbound(ws: WebSocket, message: ServerOutbound): void {
 }
 
 function sendError(ws: WebSocket, error: string): void {
-  sendServerOutbound(ws, { type: "ERROR", message: error });
+  sendServerOutbound(ws, { type: "error", message: error });
 }
 
 function broadcastToAll(wss: WebSocketServer, message: WSMessage): void {

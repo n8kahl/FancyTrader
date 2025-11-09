@@ -148,7 +148,7 @@ describe("setupWebSocketHandler", () => {
     client.emit("message", Buffer.from("not-json"));
 
     const errorPayload = parseLast(client);
-    expect(errorPayload).toMatchObject({ type: "ERROR", message: expect.stringContaining("Invalid") });
+    expect(errorPayload).toMatchObject({ type: "error", message: expect.stringContaining("Invalid") });
   });
 
   it("responds to ping frames", () => {
@@ -308,6 +308,6 @@ describe("setupWebSocketHandler", () => {
 
     client.emit("message", 42 as unknown as Buffer);
     const errorPayload = parseLast(client);
-    expect(errorPayload?.type).toBe("ERROR");
+    expect(errorPayload?.type).toBe("error");
   });
 });

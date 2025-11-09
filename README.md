@@ -81,7 +81,7 @@ packages/
 
 - Run backtests via `/api/backtest/run` (see `docs/backtesting.md`).
 - Share results or live trades to Discord with `/api/share/discord/*` endpoints.
-- Create price alerts via `/api/alerts`; the evaluator polls Polygon snapshots every `ALERT_POLL_MS` ms and broadcasts `{ type: "ALERT" }` via the main WS feed.
+- Create price alerts via `/api/alerts`; the evaluator polls Polygon snapshots every `ALERT_POLL_MS` ms and broadcasts `{ type: "alert" }` via the main WS feed.
 
 ## Massive/Polygon troubleshooting
 

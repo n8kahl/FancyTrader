@@ -137,7 +137,9 @@ export type WSMessageType =
   | "SETUP_UPDATE"
   | "PRICE_UPDATE"
   | "OPTIONS_UPDATE"
-  | "ERROR"
+  | "error"
+  | "status"
+  | "alert"
   | "PING"
   | "PONG"
   | "SERVICE_STATE";

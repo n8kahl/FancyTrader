@@ -229,7 +229,7 @@ export function useBackendConnection(
         }
         break;
 
-      case "ERROR": {
+      case "error": {
         const errorMessage = extractErrorPayload(message.payload);
         logger.error("WebSocket error:", { error: errorMessage });
         toast.error("WebSocket Error", {

@@ -18,7 +18,7 @@ The workspace uses pnpm workspaces so every package consumes types and runtime h
 - **Bootstrap:** `createApp` wires middleware, routers, metrics and error handling. `index.ts` hosts the HTTP + WebSocket server, broadcasts alerts, and starts the Polygon streaming service. Tests can import `createApp` without binding a port.
 - **Routes:** `/api/market/*`, `/api/options/*`, `/api/watchlist/*`, `/api/backtest/*`, `/api/alerts`, `/api/share/*` etc. Every payload is validated with the shared zod schemas. `PolygonClient` owns REST calls (aggregates, snapshots, options chain) and `SupabaseService` persists setups/watchlists when Supabase creds are present.
 - **Messaging:** `setupWebSocketHandler` tracks connected clients, manages Polygon subscriptions, handles pings, and emits `SETUP_UPDATE`, `ALERT`, `SUBSCRIPTIONS`, `STATUS`, and `ERROR` payloads shaped by `wsOutboundSchema`.
-- **Schedulers:** `AlertEvaluator` polls Polygon snapshots for watched symbols and pushes `{ type: "ALERT" }` packets over the WebSocket broadcast helper.
+- **Schedulers:** `AlertEvaluator` polls Polygon snapshots for watched symbols and pushes `{ type: "alert" }` packets over the WebSocket broadcast helper.
 - **Observability:** `metrics.ts` tracks HTTP + Polygon counters, `/healthz` exposes uptime/build info, `/readyz` asserts Polygon reachability and WebSocket readiness.
 
 ## Frontend application

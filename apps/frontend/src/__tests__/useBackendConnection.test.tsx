@@ -230,7 +230,7 @@ describeHook("useBackendConnection", () => {
 
     act(() => {
       harness.emitWsMessage({
-        type: "ERROR",
+        type: "error",
         payload: { error: "Too many requests" },
       });
     });
@@ -332,7 +332,7 @@ describeHook("useBackendConnection", () => {
     act(() => {
       harness.emitWsMessage({ type: "SETUP_UPDATE", payload: null as unknown as WSMessage["payload"] });
       harness.emitWsMessage({ type: "PRICE_UPDATE", payload: undefined as unknown as WSMessage["payload"] });
-      harness.emitWsMessage({ type: "ERROR", payload: { message: "not-typed" } });
+      harness.emitWsMessage({ type: "error", payload: { message: "not-typed" } });
     });
 
     expect(harness.toast.error).toHaveBeenCalledWith(

@@ -11,12 +11,12 @@ export type WSMessageType =
   | "SETUP_UPDATE"
   | "PRICE_UPDATE"
   | "OPTIONS_UPDATE"
-  | "ERROR"
+  | "error"
+  | "status"
+  | "alert"
   | "PING"
   | "PONG"
-  | "STATUS"
   | "SUBSCRIPTIONS"
-  | "ALERT"
   | "SERVICE_STATE";
 
 export interface WSMessage {
@@ -229,21 +229,21 @@ export class WebSocketClient {
           timestamp: outbound.time,
         });
         break;
-      case "STATUS":
+      case "status":
         if (outbound.message !== "HEARTBEAT") {
-          this.dispatch({ type: "STATUS", payload: { message: outbound.message }, timestamp: Date.now() });
+          this.dispatch({ type: "status", payload: { message: outbound.message }, timestamp: Date.now() });
         }
         break;
-      case "ERROR":
-        this.dispatch({ type: "ERROR", payload: { error: outbound.message, code: outbound.code }, timestamp: Date.now() });
+      case "error":
+        this.dispatch({ type: "error", payload: { error: outbound.message, code: outbound.code }, timestamp: Date.now() });
         break;
       case "SUBSCRIPTIONS":
         this.subscribedSymbols = new Set(outbound.symbols);
         this.dispatch({ type: "SUBSCRIPTIONS", payload: { symbols: outbound.symbols }, timestamp: Date.now() });
         break;
-      case "ALERT":
+      case "alert":
         this.dispatch({
-          type: "ALERT",
+          type: "alert",
           payload: {
             id: outbound.id,
             symbol: outbound.symbol,

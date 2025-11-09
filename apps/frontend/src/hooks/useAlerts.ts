@@ -40,7 +40,7 @@ export function useAlerts(limit = 25) {
 
   useEffect(() => {
     const handleMessage = (message: WSMessage): void => {
-      if (message.type !== "ALERT") {
+      if (message.type !== "alert") {
         return;
       }
 

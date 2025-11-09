@@ -36,7 +36,7 @@ globalThis.__WSS_READY__ = false;
 const polygonClient = new PolygonClient();
 
 const broadcastAlert = (payload: AlertBroadcastPayload): void => {
-  const message: ServerOutbound = { type: "ALERT", ...payload };
+  const message: ServerOutbound = { type: "alert", ...payload };
   const serialized = JSON.stringify(message);
   for (const client of wss.clients) {
     if (client.readyState === client.OPEN) {

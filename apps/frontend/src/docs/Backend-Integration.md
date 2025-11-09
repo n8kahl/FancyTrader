@@ -283,7 +283,7 @@ Use the "Go Live" / "Mock" button in the UI:
 
 ```json
 {
-  "type": "ERROR",
+  "type": "error",
   "payload": {
     "error": "Connection failed"
   }
