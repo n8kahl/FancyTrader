@@ -32,10 +32,38 @@ try {
     WORKER_SYMBOLS: process.env.WORKER_SYMBOLS || "SPY,QQQ",
     every,
   });
-  const run = () =>
-    Promise.resolve(mod.main())
-      .then(() => console.log("[diag] main() returned"))
-      .catch((e) => console.error("[diag] main() failed", e));
+  const run = async () => {
+    try {
+      await Promise.resolve(mod.main());
+      console.log("[diag] main() returned");
+    } catch (e) {
+      console.error("[diag] main() failed", e);
+    }
+    // --- heartbeat upsert (out-of-band observability, no worker code changes) ---
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const url = process.env.SUPABASE_URL;
+      const key = process.env.SUPABASE_SERVICE_KEY;
+      if (url && key) {
+        const sb = createClient(url, key, { auth: { persistSession: false } });
+        const now = new Date().toISOString();
+        const row = {
+          job_name: "heartbeat_worker",
+          window_start: now,
+          status: "success",
+          meta: { source: "start.mjs", note: "post-main heartbeat" },
+        };
+        const { error } = await sb.from("scan_jobs").upsert(row, { onConflict: "job_name,window_start" });
+        if (error) console.error("[heartbeat] upsert FAIL", error.message);
+        else console.log("[heartbeat] upsert OK", now);
+      } else {
+        console.warn("[heartbeat] skipped: missing SUPABASE_URL or SUPABASE_SERVICE_KEY");
+      }
+    } catch (e) {
+      console.error("[heartbeat] error", e?.message || e);
+    }
+    // ---------------------------------------------------------------------------
+  };
   run();
   setInterval(run, every);
 } catch (e) {
