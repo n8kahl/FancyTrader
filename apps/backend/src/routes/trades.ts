@@ -1,6 +1,6 @@
 import type { Express, Request } from "express";
 import { Router } from "express";
-import { writeLimiter } from "../middleware/rateLimit";
+import { writeLimiter } from "../middleware/rateLimit.js";
 import { z } from "zod";
 import {
   TradeCreate,
@@ -10,8 +10,8 @@ import {
   getTrade,
   updateTrade,
   deleteTrade,
-} from "../services/tradeService";
-import { asyncHandler } from "../utils/asyncHandler";
+} from "../services/tradeService.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 
 const idParamSchema = z.object({ id: z.string().min(1) });
 const missingUserResponse = { error: "Missing userId (x-user-id header or ?userId=)" };

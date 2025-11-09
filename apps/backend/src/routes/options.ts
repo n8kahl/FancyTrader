@@ -1,12 +1,12 @@
 import { Express } from "express";
-import { PolygonClient } from "../services/polygonClient";
-import { asyncHandler } from "../utils/asyncHandler";
+import { PolygonClient } from "../services/polygonClient.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import {
   optionChainQuerySchema,
   optionContractsQuerySchema,
   symbolWithOptionParamSchema,
   underlyingParamSchema,
-} from "../validation/schemas";
+} from "../validation/schemas.js";
 
 const polygonClient = new PolygonClient();
 

@@ -1,4 +1,4 @@
-import type { StrategyParams, ConfluenceKey, MtfWindow } from "@fancytrader/shared/cjs";
+import type { StrategyParams, ConfluenceKey, MtfWindow } from "@fancytrader/shared";
 
 const DEFAULT_R_TARGETS: number[] = [1, 2, 3];
 const DEFAULT_MTF_WINDOWS: MtfWindow[] = [

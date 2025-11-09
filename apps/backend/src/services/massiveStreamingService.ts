@@ -1,6 +1,6 @@
 import EventEmitter from "events";
 import WebSocket from "ws";
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger.js";
 
 export type MassiveStreamingOptions = {
   baseUrl: string;
@@ -10,7 +10,8 @@ export type MassiveStreamingOptions = {
   logger?: (event: string, meta?: Record<string, unknown>) => void;
 };
 
-const log = (event: string, meta?: Record<string, unknown>) => logger.info({ event, ...meta }, "massive_ws");
+const log = (event: string, meta?: Record<string, unknown>) =>
+  logger.info("massive_ws", { event, ...meta });
 
 export class MassiveStreamingService extends EventEmitter {
   private ws?: WebSocket;

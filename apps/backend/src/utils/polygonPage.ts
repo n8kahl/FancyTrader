@@ -1,6 +1,6 @@
 import axios from "axios";
 import { setTimeout as sleep } from "node:timers/promises";
-import { incPolygonRest } from "./metrics";
+import { incPolygonRest } from "./metrics.js";
 
 export interface PageShape<T> {
   results: T[];

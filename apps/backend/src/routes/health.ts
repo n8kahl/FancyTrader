@@ -1,9 +1,9 @@
 import { Router } from "express";
 import axios from "axios";
-import { metrics } from "../utils/metrics";
-import { featureFlags } from "../config/features";
-import type { PolygonServiceState } from "../services/polygonStreamingService";
-import { requireAdminKey } from "../middleware/adminKey";
+import { metrics } from "../utils/metrics.js";
+import { featureFlags } from "../config/features.js";
+import type { PolygonServiceState } from "../services/polygonStreamingService.js";
+import { requireAdminKey } from "../middleware/adminKey.js";
 
 declare global {
   var __WSS_READY__: boolean | undefined;

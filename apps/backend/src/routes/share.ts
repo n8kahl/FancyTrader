@@ -1,9 +1,9 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import { z } from "zod";
-import { tradeSchema } from "@fancytrader/shared/cjs";
-import { DiscordService } from "../services/discordService";
-import { idempotencyMiddleware } from "../middleware/idempotency";
+import { tradeSchema } from "@fancytrader/shared";
+import { DiscordService } from "../services/discordService.js";
+import { idempotencyMiddleware } from "../middleware/idempotency.js";
 
 const tradeShareSchema = z.object({ trade: tradeSchema });
 

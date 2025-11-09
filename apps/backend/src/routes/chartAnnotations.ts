@@ -1,6 +1,6 @@
 import { Express, Request, Router } from "express";
 import { z } from "zod";
-import { asyncHandler } from "../utils/asyncHandler";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import {
   AnnotationCreateSchema,
   AnnotationUpdateSchema,
@@ -8,7 +8,7 @@ import {
   deleteAnnotation,
   listAnnotations,
   updateAnnotation,
-} from "../services/annotationService";
+} from "../services/annotationService.js";
 
 const querySchema = z.object({
   symbol: z

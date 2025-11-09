@@ -1,4 +1,4 @@
-import { HttpError, badRequest, notFound, tooManyRequests, internalError } from "../utils/httpError";
+import { HttpError, badRequest, notFound, tooManyRequests, internalError } from "../utils/httpError.js";
 
 describe("HttpError", () => {
   it("carries status, code, and details", () => {

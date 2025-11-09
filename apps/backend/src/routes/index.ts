@@ -1,18 +1,18 @@
 import { Express } from "express";
-import { setupSetupsRoutes } from "./setups";
-import { setupWatchlistRoutes } from "./watchlist";
-import { setupMarketDataRoutes } from "./marketData";
-import { setupOptionsRoutes } from "./options";
-import { setupBacktestRoutes } from "./backtest";
-import { setupAlertsRoutes } from "./alerts";
-import { setupShareRoutes } from "./share";
-import { setupTradesRoutes } from "./trades";
-import { setupChartAnnotationsRoutes } from "./chartAnnotations";
-import { SupabaseService } from "../services/supabaseService";
-import { SupabaseSetupsService } from "../services/supabaseSetups";
-import { StrategyDetectorService } from "../services/strategyDetector";
-import { PolygonStreamingService } from "../services/polygonStreamingService";
-import { AlertRegistry } from "../alerts/registry";
+import { setupSetupsRoutes } from "./setups.js";
+import { setupWatchlistRoutes } from "./watchlist.js";
+import { setupMarketDataRoutes } from "./marketData.js";
+import { setupOptionsRoutes } from "./options.js";
+import { setupBacktestRoutes } from "./backtest.js";
+import { setupAlertsRoutes } from "./alerts.js";
+import { setupShareRoutes } from "./share.js";
+import { setupTradesRoutes } from "./trades.js";
+import { setupChartAnnotationsRoutes } from "./chartAnnotations.js";
+import { SupabaseService } from "../services/supabaseService.js";
+import { SupabaseSetupsService } from "../services/supabaseSetups.js";
+import { StrategyDetectorService } from "../services/strategyDetector.js";
+import { PolygonStreamingService } from "../services/polygonStreamingService.js";
+import { AlertRegistry } from "../alerts/registry.js";
 
 interface Services {
   supabaseService: SupabaseService;

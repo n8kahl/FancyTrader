@@ -1,10 +1,10 @@
 import WebSocket from "ws";
 import { EventEmitter } from "events";
-import { logger } from "../utils/logger";
-import { incPolygonWsMessages } from "../utils/metrics";
-import { StrategyDetectorService } from "./strategyDetector";
-import { Bar, Trade, Quote } from "../types";
-import { featureFlags } from "../config/features";
+import { logger } from "../utils/logger.js";
+import { incPolygonWsMessages } from "../utils/metrics.js";
+import { StrategyDetectorService } from "./strategyDetector.js";
+import { Bar, Trade, Quote } from "../types/index.js";
+import { featureFlags } from "../config/features.js";
 
 type PolygonCluster = "stocks" | "options" | "indices" | "forex" | "crypto";
 

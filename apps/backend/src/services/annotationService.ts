@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { supabaseAdmin, assertAdminClient } from "../lib/supabase";
+import { supabaseAdmin, assertAdminClient } from "../lib/supabase.js";
 
 export const AnnotationCreateSchema = z.object({
   symbol: z.string().min(1),

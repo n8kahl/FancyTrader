@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { logger } from "../utils/logger";
+import { logger } from "../utils/logger.js";
 
 export type SetupRecord = {
   id: string;
@@ -45,7 +45,7 @@ export class SupabaseSetupsService {
       .limit(limit);
 
     if (error) {
-      logger.error({ error, owner }, "Failed to list setups");
+      logger.error("Failed to list setups", { error, owner });
       throw error;
     }
 
@@ -61,7 +61,7 @@ export class SupabaseSetupsService {
       .single();
 
     if (error) {
-      logger.error({ error, owner, symbol }, "Failed to save setup");
+      logger.error("Failed to save setup", { error, owner, symbol });
       throw error;
     }
 
@@ -79,7 +79,7 @@ export class SupabaseSetupsService {
     const { error } = await supabase.from("setups").delete().match(filters);
 
     if (error) {
-      logger.error({ error, id, owner }, "Failed to delete setup");
+      logger.error("Failed to delete setup", { error, id, owner });
       throw error;
     }
   }

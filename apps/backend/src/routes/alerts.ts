@@ -1,9 +1,9 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { Router } from "express";
 import { z } from "zod";
-import { alertConditionSchema } from "@fancytrader/shared/cjs";
-import { AlertRegistry } from "../alerts/registry";
-import { badRequest, notFound } from "../utils/httpError";
+import { alertConditionSchema } from "@fancytrader/shared";
+import { AlertRegistry } from "../alerts/registry.js";
+import { badRequest, notFound } from "../utils/httpError.js";
 
 const createSchema = z.object({
   symbol: z.string().min(1).transform((value) => value.trim().toUpperCase()),

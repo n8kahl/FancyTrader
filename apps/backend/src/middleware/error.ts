@@ -1,5 +1,5 @@
 import type { ErrorRequestHandler } from "express";
-import { HttpError } from "../utils/httpError";
+import { HttpError } from "../utils/httpError.js";
 
 
 interface AppErrorLike {

@@ -1,9 +1,9 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { setupTypeSchema } from "@fancytrader/shared/cjs";
-import { DetectedSetup, WatchlistSymbol, StrategyConfig } from "../types";
-import { logger } from "../utils/logger";
-import { tradeDtoSchema, type TradeDto } from "../validation/schemas";
+import { setupTypeSchema } from "@fancytrader/shared";
+import { DetectedSetup, WatchlistSymbol, StrategyConfig } from "../types/index.js";
+import { logger } from "../utils/logger.js";
+import { tradeDtoSchema, type TradeDto } from "../validation/schemas.js";
 
 const kvRowSchema = z.object({
   value: z.string(),

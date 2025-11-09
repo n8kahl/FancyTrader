@@ -1,4 +1,4 @@
-import { Bar, TechnicalIndicators } from "../types";
+import { Bar, TechnicalIndicators } from "../types/index.js";
 
 /**
  * Calculate Exponential Moving Average

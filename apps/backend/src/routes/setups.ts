@@ -1,17 +1,17 @@
 import type { Request } from "express";
 import { Express } from "express";
-import type { SupabaseSetupsService } from "../services/supabaseSetups";
-import type { StrategyDetectorService } from "../services/strategyDetector";
-import { asyncHandler } from "../utils/asyncHandler";
-import { writeLimiter } from "../middleware/rateLimit";
-import { strategyParamsSchema, type StrategyParams } from "@fancytrader/shared/cjs";
-import { defaultStrategyParams } from "../config/strategy.defaults";
-import { badRequest } from "../utils/httpError";
+import type { SupabaseSetupsService } from "../services/supabaseSetups.js";
+import type { StrategyDetectorService } from "../services/strategyDetector.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { writeLimiter } from "../middleware/rateLimit.js";
+import { strategyParamsSchema, type StrategyParams } from "@fancytrader/shared";
+import { defaultStrategyParams } from "../config/strategy.defaults.js";
+import { badRequest } from "../utils/httpError.js";
 import {
   setupIdParamSchema,
   symbolParamSchema,
   userIdParamSchema,
-} from "../validation/schemas";
+} from "../validation/schemas.js";
 
 interface Services {
   supabaseSetups: SupabaseSetupsService;

@@ -4,7 +4,7 @@ import type {
   ConfidenceBreakdown,
   ConfluenceScore,
   ConfluenceKey,
-} from "@fancytrader/shared/cjs";
+} from "@fancytrader/shared";
 import {
   Bar,
   Trade,
@@ -12,7 +12,7 @@ import {
   DetectedSetup,
   ConfluenceFactor,
   TechnicalIndicators,
-} from "../types";
+} from "../types/index.js";
 import {
   calculateAllIndicators,
   isBullishEMAAlignment,
@@ -20,9 +20,9 @@ import {
   isRSIOversold,
   isRSIOverbought,
   isPatientCandle,
-} from "./technicalIndicators";
-import { logger } from "../utils/logger";
-import { defaultStrategyParams, defaultConfluenceWeights } from "../config/strategy.defaults";
+} from "./technicalIndicators.js";
+import { logger } from "../utils/logger.js";
+import { defaultStrategyParams, defaultConfluenceWeights } from "../config/strategy.defaults.js";
 
 interface SymbolData {
   symbol: string;

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tradeStatusSchema } from "@fancytrader/shared/cjs";
+import { tradeStatusSchema } from "@fancytrader/shared";
 
 
 export const symbolParamSchema = z.object({ symbol: z.string().min(1) });

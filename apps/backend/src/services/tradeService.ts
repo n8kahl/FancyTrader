@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { supabaseAdmin, assertAdminClient } from "../lib/supabase";
+import { supabaseAdmin, assertAdminClient } from "../lib/supabase.js";
 
 export const TradeSide = z.enum(["BUY", "SELL"]);
 export const TradeStatus = z.enum(["OPEN", "CLOSED", "CANCELLED"]);

@@ -1,8 +1,8 @@
 import { Express } from "express";
-import { PolygonClient } from "../services/polygonClient";
-import { asyncHandler } from "../utils/asyncHandler";
-import { aggQuerySchema, symbolParamSchema, cursorContractsQuerySchema } from "../validation/schemas";
-import { badRequest, internalError } from "../utils/httpError";
+import { PolygonClient } from "../services/polygonClient.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
+import { aggQuerySchema, symbolParamSchema, cursorContractsQuerySchema } from "../validation/schemas.js";
+import { badRequest, internalError } from "../utils/httpError.js";
 
 const polygonClient = new PolygonClient();
 

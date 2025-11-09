@@ -1,12 +1,12 @@
 import "dotenv/config";
-import type { ServerOutbound } from "@fancytrader/shared/cjs";
+import type { ServerOutbound } from "@fancytrader/shared";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
-import { setupWebSocketHandler } from "./websocket/handler";
-import { PolygonClient } from "./services/polygonClient";
-import { AlertEvaluator, type AlertBroadcastPayload } from "./alerts/evaluator";
-import { logger } from "./utils/logger";
-import { createApp } from "./app";
+import { setupWebSocketHandler } from "./websocket/handler.js";
+import { PolygonClient } from "./services/polygonClient.js";
+import { AlertEvaluator, type AlertBroadcastPayload } from "./alerts/evaluator.js";
+import { logger } from "./utils/logger.js";
+import { createApp } from "./app.js";
 
 declare global {
   var __WSS_READY__: boolean | undefined;

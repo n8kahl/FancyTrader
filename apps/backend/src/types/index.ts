@@ -1,5 +1,5 @@
-import type { ConfidenceBreakdown } from "@fancytrader/shared/cjs";
-import type { PolygonServiceState } from "../services/polygonStreamingService";
+import type { ConfidenceBreakdown } from "@fancytrader/shared";
+import type { PolygonServiceState } from "../services/polygonStreamingService.js";
 
 // Market Data Types
 export interface Bar {

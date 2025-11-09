@@ -1,4 +1,4 @@
-import type { BacktestTrade } from "./runner";
+import type { BacktestTrade } from "./runner.js";
 
 export interface PnLSummary {
   trades: number;

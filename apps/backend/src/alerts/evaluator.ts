@@ -1,6 +1,6 @@
-import { AlertRegistry, type Alert } from "./registry";
-import { logger } from "../utils/logger";
-import type { PolygonClient } from "../services/polygonClient";
+import { AlertRegistry, type Alert } from "./registry.js";
+import { logger } from "../utils/logger.js";
+import type { PolygonClient } from "../services/polygonClient.js";
 
 export interface AlertBroadcastPayload {
   id: string;

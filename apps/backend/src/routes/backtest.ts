@@ -1,12 +1,12 @@
 import type { Express } from "express";
 import { Router } from "express";
 import { z } from "zod";
-import type { StrategyParams } from "@fancytrader/shared/cjs";
-import { strategyParamsSchema } from "@fancytrader/shared/cjs";
-import { fetchAggregates, runDetectors, type BacktestConfig } from "../backtest/runner";
-import { bucketByWeek, computePnL } from "../backtest/metrics";
-import { PolygonClient } from "../services/polygonClient";
-import { defaultStrategyParams } from "../config/strategy.defaults";
+import type { StrategyParams } from "@fancytrader/shared";
+import { strategyParamsSchema } from "@fancytrader/shared";
+import { fetchAggregates, runDetectors, type BacktestConfig } from "../backtest/runner.js";
+import { bucketByWeek, computePnL } from "../backtest/metrics.js";
+import { PolygonClient } from "../services/polygonClient.js";
+import { defaultStrategyParams } from "../config/strategy.defaults.js";
 
 const runSchema = z.object({
   symbol: z.string().min(1),

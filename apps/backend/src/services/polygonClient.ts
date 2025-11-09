@@ -1,11 +1,11 @@
 import axios from "axios";
 import { z } from "zod";
-import type { OptionContract } from "@fancytrader/shared/cjs";
-import { logger } from "../utils/logger";
-import { Bar } from "../types";
-import { followNextUrls, encodeCursor, decodeCursor, type PageShape } from "../utils/polygonPage";
-import { incPolygonRest } from "../utils/metrics";
-import { HttpClient } from "../utils/http";
+import type { OptionContract } from "@fancytrader/shared";
+import { logger } from "../utils/logger.js";
+import { Bar } from "../types/index.js";
+import { followNextUrls, encodeCursor, decodeCursor, type PageShape } from "../utils/polygonPage.js";
+import { incPolygonRest } from "../utils/metrics.js";
+import { HttpClient } from "../utils/http.js";
 
 const MASSIVE_BASE_URL = "https://api.massive.com";
 const DEFAULT_USER_AGENT = process.env.HTTP_USER_AGENT ?? "FancyTrader-Backend/1.0";
@@ -61,14 +61,14 @@ const chainPagedResponseSchema = z.object({
 
 const logError = (context: string, error: unknown): void => {
   logger.error(
+    "PolygonClient error",
     {
       context,
       err:
         error instanceof Error
           ? { message: error.message, stack: error.stack }
           : { message: String(error) },
-    },
-    "PolygonClient error"
+    }
   );
 };
 
@@ -144,8 +144,8 @@ export class PolygonClient {
     });
 
     logger.info(
-      { baseUrl: this.baseUrl, usingMassiveKey: Boolean(process.env.MASSIVE_API_KEY) },
-      "PolygonClient configured"
+      "PolygonClient configured",
+      { baseUrl: this.baseUrl, usingMassiveKey: Boolean(process.env.MASSIVE_API_KEY) }
     );
   }
 

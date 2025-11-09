@@ -3,19 +3,19 @@ import express, { type Request, type Response } from "express";
 import compression from "compression";
 import cors from "cors";
 import helmet from "helmet";
-import { healthRouter } from "./routes/health";
-import { setupRoutes } from "./routes";
-import { incHttp, register } from "./utils/metrics";
-import { logger } from "./utils/logger";
-import { SupabaseService } from "./services/supabaseService";
-import { SupabaseSetupsService } from "./services/supabaseSetups";
-import { StrategyDetectorService } from "./services/strategyDetector";
-import { PolygonStreamingService } from "./services/polygonStreamingService";
-import { MassiveStreamingService } from "./services/massiveStreamingService";
-import { AlertRegistry } from "./alerts/registry";
-import { defaultStrategyParams } from "./config/strategy.defaults";
-import { errorHandler } from "./middleware/error";
-import { alertLimiter, shareLimiter } from "./middleware/rateLimit";
+import { healthRouter } from "./routes/health.js";
+import { setupRoutes } from "./routes/index.js";
+import { incHttp, register } from "./utils/metrics.js";
+import { logger } from "./utils/logger.js";
+import { SupabaseService } from "./services/supabaseService.js";
+import { SupabaseSetupsService } from "./services/supabaseSetups.js";
+import { StrategyDetectorService } from "./services/strategyDetector.js";
+import { PolygonStreamingService } from "./services/polygonStreamingService.js";
+import { MassiveStreamingService } from "./services/massiveStreamingService.js";
+import { AlertRegistry } from "./alerts/registry.js";
+import { defaultStrategyParams } from "./config/strategy.defaults.js";
+import { errorHandler } from "./middleware/error.js";
+import { alertLimiter, shareLimiter } from "./middleware/rateLimit.js";
 
 const defaultAllowedOrigins = ["https://fancy-trader.vercel.app", "http://localhost:5173"];
 const corsAllowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
@@ -224,11 +224,11 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
         cluster: process.env.MASSIVE_WS_CLUSTER || "options",
         apiKey,
         subscriptions: [],
-        logger: (event, meta) => logger.debug({ event, ...meta }, "massive_ws"),
+        logger: (event, meta) => logger.debug("massive_ws", { event, ...meta }),
       });
 
-      massiveStream.on("message", (msg) => logger.debug({ msg }, "massive_ws_message"));
-      massiveStream.on("error", (error) => logger.error({ error }, "massive_ws_error"));
+      massiveStream.on("message", (msg) => logger.debug("massive_ws_message", { msg }));
+      massiveStream.on("error", (error) => logger.error("massive_ws_error", { error }));
       massiveStream.start();
       massiveStreamStarted = true;
     }

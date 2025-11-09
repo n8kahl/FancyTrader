@@ -1,14 +1,14 @@
 import { WebSocketServer } from "ws";
 import type { IncomingMessage } from "http";
 import type { RawData, WebSocket } from "ws";
-import type { ServerOutbound } from "@fancytrader/shared/cjs";
+import type { ServerOutbound } from "@fancytrader/shared";
 import { z } from "zod";
-import { WSMessage, DetectedSetup } from "../types";
-import { PolygonStreamingService } from "../services/polygonStreamingService";
-import { StrategyDetectorService } from "../services/strategyDetector";
-import { logger } from "../utils/logger";
-import { onWsConnect, onWsDisconnect } from "../utils/metrics";
-import { isAllowedOrigin } from "../security/wsGuard";
+import { WSMessage, DetectedSetup } from "../types/index.js";
+import { PolygonStreamingService } from "../services/polygonStreamingService.js";
+import { StrategyDetectorService } from "../services/strategyDetector.js";
+import { logger } from "../utils/logger.js";
+import { onWsConnect, onWsDisconnect } from "../utils/metrics.js";
+import { isAllowedOrigin } from "../security/wsGuard.js";
 
 interface ClientMeta {
   subscribedSymbols: Set<string>;

@@ -1,18 +1,18 @@
 import { Express, Request, Router } from "express";
-import type { SupabaseService } from "../services/supabaseService";
-import { writeLimiter } from "../middleware/rateLimit";
-import type { StrategyDetectorService } from "../services/strategyDetector";
-import type { PolygonStreamingService } from "../services/polygonStreamingService";
-import { WatchlistSymbol } from "../types";
-import { asyncHandler } from "../utils/asyncHandler";
+import type { SupabaseService } from "../services/supabaseService.js";
+import { writeLimiter } from "../middleware/rateLimit.js";
+import type { StrategyDetectorService } from "../services/strategyDetector.js";
+import type { PolygonStreamingService } from "../services/polygonStreamingService.js";
+import { WatchlistSymbol } from "../types/index.js";
+import { asyncHandler } from "../utils/asyncHandler.js";
 import {
   userIdParamSchema,
   watchlistBodySchema,
   watchlistAddSchema,
   watchlistBulkSchema,
   watchlistSymbolParamSchema,
-} from "../validation/schemas";
-import type { WatchlistInput } from "../validation/schemas";
+} from "../validation/schemas.js";
+import type { WatchlistInput } from "../validation/schemas.js";
 
 const DEMO_USER_ID = process.env.DEMO_USER_ID?.trim();
 

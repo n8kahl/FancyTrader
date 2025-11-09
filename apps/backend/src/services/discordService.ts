@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import axios, { AxiosError } from "axios";
-import type { Trade as SharedTrade } from "@fancytrader/shared/cjs";
-import { DiscordAlert, DetectedSetup, OptionsContract } from "../types";
-import { logger } from "../utils/logger";
-import { HttpError } from "../utils/httpError";
-import { redactSecrets } from "../utils/redact";
+import type { Trade as SharedTrade } from "@fancytrader/shared";
+import { DiscordAlert, DetectedSetup, OptionsContract } from "../types/index.js";
+import { logger } from "../utils/logger.js";
+import { HttpError } from "../utils/httpError.js";
+import { redactSecrets } from "../utils/redact.js";
 
 export interface DiscordField {
   name: string;
