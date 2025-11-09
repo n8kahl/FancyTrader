@@ -29,6 +29,20 @@ export class MassiveClient {
     });
   }
 
+  private isOptionTicker(t: string): boolean {
+    return /^O:/.test(t);
+  }
+
+  private isIndexTicker(t: string): boolean {
+    return /^I:/.test(t);
+  }
+
+  private parseUnderlyingFromOption(t: string): string {
+    const raw = t.replace(/^O:/, "");
+    const m = raw.match(/^([A-Z\.]+)[0-9]/);
+    return m ? m[1] : raw;
+  }
+
   private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
     let attempt = 0;
     while (true) {
@@ -54,8 +68,11 @@ export class MassiveClient {
 
   async getMinuteAggs(symbol: string, minutes = 30): Promise<unknown[]> {
     return this.withRetry(async () => {
-      const { data } = await this.http.get("/v1/aggs/minute", {
-        params: { symbol, window: minutes },
+      const to = new Date();
+      const from = new Date(to.getTime() - minutes * 60_000);
+      const path = `/v2/aggs/ticker/${encodeURIComponent(symbol)}/range/1/minute/${from.toISOString()}/${to.toISOString()}`;
+      const { data } = await this.http.get(path, {
+        params: { adjusted: true, sort: "asc", limit: minutes },
       });
       return Array.isArray(data?.results) ? data.results : [];
     });
@@ -63,10 +80,26 @@ export class MassiveClient {
 
   async getTickerSnapshot(symbol: string): Promise<unknown> {
     return this.withRetry(async () => {
-      const { data } = await this.http.get("/v1/snapshot/ticker", {
-        params: { symbol },
-      });
-      return data ?? {};
+      if (this.isOptionTicker(symbol)) {
+        const underlying = this.parseUnderlyingFromOption(symbol);
+        const { data } = await this.http.get(
+          `/v3/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(symbol)}`
+        );
+        return data?.results ?? {};
+      }
+
+      if (this.isIndexTicker(symbol)) {
+        const idx = symbol.replace(/^I:/, "");
+        const { data } = await this.http.get(
+          `/v3/snapshot/indices/${encodeURIComponent(idx)}`
+        );
+        return data ?? {};
+      }
+
+      const { data } = await this.http.get(
+        `/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(symbol)}`
+      );
+      return data?.ticker ?? {};
     });
   }
 }
