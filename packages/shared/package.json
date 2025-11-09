@@ -26,13 +26,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
     },
     "./cjs": {
-      "types": "./dist/index.d.cts",
-      "import": "./dist/index.cjs",
-      "require": "./dist/index.cjs",
-      "default": "./dist/index.cjs"
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs"
     }
   }
 }
