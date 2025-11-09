@@ -1,43 +1,43 @@
-import http from 'node:http';
+import express from "express";
 
-process.on('unhandledRejection', e => console.error('[diag] unhandledRejection', e));
-process.on('uncaughtException', e => console.error('[diag] uncaughtException', e));
+const mod = await import("./dist/index.js");
+const every = Number(process.env.WORKER_EVERY_MS || 60000);
+const app = express();
+app.use(express.json());
 
-const PORT  = Number(process.env.PORT) || 3000;
-const every = Number(process.env.WORKER_EVERY_MS) || 60000;
+async function runOnce(trigger = "loop", sessionOverride) {
+  try {
+    const out = await mod.main({ trigger, sessionOverride });
+    console.log("[diag] main() returned", out ?? "");
+    return { ok: true, out };
+  } catch (e) {
+    console.error("[diag] main() failed", e);
+    return { ok: false, error: String(e) };
+  }
+}
 
-// Minimal health server so Railway marks the service healthy
-const srv = http.createServer((req, res) => {
-  if (req.url === '/health') {
-    res.writeHead(200, { 'content-type': 'text/plain' });
-    res.end('ok');
+app.get("/healthz", (_req, res) => res.send("ok"));
+app.get("/metrics", async (_req, res) => {
+  if (typeof mod.getMetrics === "function") {
+    res.type("text/plain").send(await mod.getMetrics());
   } else {
-    res.writeHead(200, { 'content-type': 'text/plain' });
-    res.end('worker');
+    res.type("text/plain").send("# no metrics");
   }
 });
-srv.listen(PORT, '0.0.0.0', () => console.log('[diag] web health listening on', PORT));
 
-// Load the compiled worker and loop it
-import('./dist/index.js')
-  .then((m) => {
-    console.log('[diag] env', {
-      MASSIVE_API_KEY: !!process.env.MASSIVE_API_KEY,
-      SUPABASE_URL: !!process.env.SUPABASE_URL,
-      SUPABASE_SERVICE_KEY: !!process.env.SUPABASE_SERVICE_KEY,
-      WORKER_SYMBOLS: process.env.WORKER_SYMBOLS || 'SPY,QQQ',
-      every
-    });
+app.post("/run-now", async (req, res) => {
+  const session = (req.query.session || req.body?.session || process.env.WORKER_FORCE_SESSION || "").toString() || undefined;
+  const result = await runOnce("manual", session);
+  res.status(result.ok ? 200 : 500).json(result);
+});
 
-    const run = () =>
-      Promise.resolve(m.main())
-        .then(() => console.log('[diag] main() returned'))
-        .catch((e) => console.error('[diag] main() failed', e));
+const port = Number(process.env.PORT || 3000);
+app.listen(port, () => console.log("[diag] web health listening on", port));
 
-    run();                // run immediately
-    setInterval(run, every); // and repeat
-  })
-  .catch((e) => {
-    console.error('[diag] import failed', e);
-    setTimeout(() => process.exit(1), 1000);
-  });
+const oneshot = process.env.WORKER_ONESHOT === "1";
+await runOnce("boot", process.env.WORKER_FORCE_SESSION);
+if (oneshot) {
+  console.log("[diag] oneshot complete, exiting");
+  process.exit(0);
+}
+setInterval(() => runOnce("loop", process.env.WORKER_FORCE_SESSION), every);
