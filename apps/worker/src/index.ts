@@ -2,18 +2,32 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { MassiveClient, marketToMode } from "@fancytrader/shared";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  logAxiosError,
+  optionQuote,
+  optionsSnapshotForContract,
+  optionsSnapshotForUnderlying,
+  universalSnapshot,
+} from "./clients/massive.js";
 
-const OPTION_OCC_RE = /^([A-Z]+)\d{6}[CP]\d{8}$/i;
+const OPTION_OCC_RE = /^(?:O:)?([A-Z]+)\d{6}[CP]\d{8}$/i;
 
-function classifySymbol(symbol: string): "index" | "option" {
+type SymbolKind = "index" | "option" | "underlying";
+
+function classifySymbol(symbol: string): SymbolKind {
   if (symbol.startsWith("I:")) return "index";
   if (OPTION_OCC_RE.test(symbol)) return "option";
-  return "index";
+  return "underlying";
 }
 
 function getUnderlyingFromOptionSymbol(optionSymbol: string): string {
-  const m = optionSymbol.toUpperCase().match(OPTION_OCC_RE);
-  return m ? m[1] : "";
+  const raw = optionSymbol.toUpperCase().replace(/^O:/, "");
+  const match = raw.match(OPTION_OCC_RE);
+  return match ? match[1] : "";
+}
+
+function ensureOptionTicker(symbol: string): string {
+  return symbol.startsWith("O:") ? symbol : `O:${symbol}`;
 }
 
 type ScanMode = "premarket" | "regular" | "aftermarket" | "closed";
@@ -96,16 +110,17 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
     if (mode === "closed") {
       const kind = classifySymbol(symbol);
       if (kind === "index") {
-        const snap = await massiveClient.getIndexSnapshot(symbol);
-        // TODO: compute & store setups from index 'snap'
-      } else {
+        await universalSnapshot([symbol]).catch((err: unknown) => logAxiosError(jobName, err));
+      } else if (kind === "option") {
         const underlying = getUnderlyingFromOptionSymbol(symbol);
         if (!underlying) throw new Error("Invalid option symbol");
-        const snap = await massiveClient.getOptionSnapshot(underlying, symbol);
-        // TODO: compute & store setups from option 'snap'
+        const optionTicker = ensureOptionTicker(symbol);
+        await optionsSnapshotForContract(underlying, optionTicker).catch((err: unknown) => logAxiosError(jobName, err));
+        await optionQuote(optionTicker).catch((err: unknown) => logAxiosError(jobName, err));
+      } else {
+        await optionsSnapshotForUnderlying(symbol).catch((err: unknown) => logAxiosError(jobName, err));
       }
     } else {
-      // During live sessions, we aggregate **indices** (and ETFs if you include them)
       const aggs = await massiveClient.getMinuteAggs(symbol, 30);
       // TODO: compute & store setups from 'aggs'
     }

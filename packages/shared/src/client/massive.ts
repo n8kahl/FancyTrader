@@ -115,6 +115,42 @@ export class MassiveClient {
       return data?.results ?? null;
     });
   }
+
+  async getTickerSnapshot(symbol: string): Promise<unknown> {
+    return this.withRetry(async () => {
+      if (symbol.startsWith("O:")) {
+        const underlying = symbol.slice(2).replace(/[^A-Z].*$/, "");
+        const { data } = await this.http.get(
+          `/v3/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(symbol)}`
+        );
+        return data?.results ?? {};
+      }
+
+      if (symbol.startsWith("I:")) {
+        const idx = symbol.replace(/^I:/, "");
+        const { data } = await this.http.get(
+          `/v3/snapshot/indices/${encodeURIComponent(idx)}`
+        );
+        return data ?? {};
+      }
+
+      const underlying = symbol.toUpperCase();
+      try {
+        const { data } = await this.http.get(
+          `/v3/snapshot/options/${encodeURIComponent(underlying)}`
+        );
+        return data?.results ?? data ?? {};
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          const { data } = await this.http.get(
+            `/v3/snapshot/options/${encodeURIComponent(underlying)}/summary`
+          );
+          return data?.results ?? data ?? {};
+        }
+        throw err;
+      }
+    });
+  }
 }
 
 // Helpers: mapping market status to our worker mode
