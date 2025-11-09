@@ -42,7 +42,7 @@ const workerModPromise = import("./dist/index.js").catch((e) => {
 });
 
 const EVERY = +process.env.WORKER_EVERY_MS || 60_000;
-const PORT = +(process.env.PORT || 8080);
+const PORT = Number(process.env.PORT) || 8080;
 
 function json(res, code, obj) {
   const body = JSON.stringify(obj);
@@ -179,4 +179,4 @@ const server = http.createServer(async (req, res) => {
   }
 })();
 
-server.listen(PORT, "0.0.0.0", () => log(`[diag] web health listening on ${PORT}`));
+server.listen(PORT, "0.0.0.0", () => log("[diag] web listening", { PORT }));
