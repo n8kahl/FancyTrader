@@ -10,6 +10,12 @@ import {
   snapshotIndices,
   underlyingFromOcc,
 } from "./clients/massive.js";
+import {
+  getIndexSnapshots,
+  prettyAxiosErr,
+  summarizeIndexForLog,
+} from "./jobs/indexSnapshot.js";
+import { smokeOption } from "./jobs/smokeOption.js";
 
 const OCC_RE = /^[A-Z]{1,6}\d{6}[CP]\d{8}$/;
 
@@ -24,6 +30,7 @@ type ScanMeta = Record<string, unknown>;
 const log = (...args: any[]) => console.log("[worker]", ...args);
 
 let massiveClient: MassiveClient = new MassiveClient();
+let INDICES_CACHE: Record<string, Record<string, unknown>> = {};
 
 const WATCH_SYMBOLS = (process.env.WORKER_SYMBOLS ?? "AAPL,MSFT")
   .split(",")
@@ -95,7 +102,12 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
   try {
     if (mode === "closed") {
       if (isIndexTicker(symbol)) {
-        await snapshotIndices([symbol]);
+        const cached = INDICES_CACHE[symbol];
+        if (cached) {
+          log("[worker] index cache hit", symbol, summarizeIndexForLog(cached));
+        } else {
+          await snapshotIndices([symbol]);
+        }
         await indexPrevBar(symbol);
       } else if (isOccTicker(symbol)) {
         if (isExpiredOcc(symbol)) {
@@ -142,6 +154,34 @@ export async function resolveCurrentMode(): Promise<ScanMode> {
 }
 
 export async function main(): Promise<void> {
+  const indicesEnv = process.env.INDICES || "I:SPX,I:NDX";
+  const indices = indicesEnv
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (indices.length) {
+    try {
+      INDICES_CACHE = await getIndexSnapshots(indices);
+      const preview = Object.entries(INDICES_CACHE)
+        .slice(0, 3)
+        .map(([t, snap]) => [t, summarizeIndexForLog(snap)]);
+      console.log("[worker] indices snapshot OK", preview);
+    } catch (e) {
+      console.error("[worker] indices snapshot FAILED", prettyAxiosErr(e));
+      INDICES_CACHE = {};
+    }
+  }
+
+  const smoke = process.env.OPTION_CONTRACT_SMOKE;
+  if (smoke) {
+    try {
+      await smokeOption(smoke.trim());
+    } catch (e) {
+      console.error("[worker] smokeOption error", e);
+    }
+  }
+
   const mode = await resolveCurrentMode();
   await scanLoop(mode);
 }
