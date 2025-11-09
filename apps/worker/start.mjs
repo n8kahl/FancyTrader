@@ -28,9 +28,19 @@ const scanLatencyMs = new promClient.Histogram({
   labelNames: ["session", "noop", "result"],
 });
 
+function forcedSessionFromEnv() {
+  const sessionEnv = process.env.WORKER_FORCE_SESSION?.toString().toLowerCase();
+  if (sessionEnv === "open" || sessionEnv === "closed") {
+    return sessionEnv;
+  }
+  return null;
+}
+
 function labels(opts = {}) {
+  const forced = forcedSessionFromEnv();
   const sessionRaw = (opts.session ?? "").toString().toLowerCase();
-  const session = sessionRaw === "open" || sessionRaw === "closed" ? sessionRaw : "unknown";
+  const detected = sessionRaw === "open" || sessionRaw === "closed" ? sessionRaw : null;
+  const session = forced ?? detected ?? "unknown";
   const noop = Boolean(opts.noop);
   return { session, noop: String(noop) };
 }
