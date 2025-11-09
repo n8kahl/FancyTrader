@@ -33,11 +33,41 @@ try {
     every,
   });
   const run = async () => {
+    const t0 = Date.now();
+    const base = process.env.MASSIVE_BASE_URL || "https://api.massive.com";
+    const key = process.env.MASSIVE_API_KEY;
+    let session = "unknown";
+    try {
+      const url = `${base}/v1/marketstatus/now`;
+      let resp = await fetch(url, { headers: key ? { Authorization: `Bearer ${key}` } : {} });
+      if ((resp.status === 401 || resp.status === 403) && key) {
+        resp = await fetch(`${url}?apiKey=${encodeURIComponent(key)}`);
+      }
+      if (resp.ok) {
+        const j = await resp.json();
+        session = j?.earlyHours
+          ? "premarket"
+          : j?.afterHours
+          ? "aftermarket"
+          : j?.market === "open"
+          ? "regular"
+          : j?.market === "closed"
+          ? "closed"
+          : "unknown";
+      } else {
+        console.warn("[scan_run] status non-200", resp.status);
+      }
+    } catch (e) {
+      console.warn("[scan_run] status fetch failed", e?.message || e);
+    }
+
+    let runError = null;
     try {
       await Promise.resolve(mod.main());
       console.log("[diag] main() returned");
     } catch (e) {
       console.error("[diag] main() failed", e);
+      runError = e;
     }
     // --- heartbeat upsert (out-of-band observability, no worker code changes) ---
     try {
@@ -73,13 +103,28 @@ try {
       if (url && key) {
         const sb = createClient(url, key, { auth: { persistSession: false } });
         const now = new Date().toISOString();
-        const row = {
+        const scanRow = {
+          job_name: "scan_run",
+          window_start: now,
+          status: runError ? "failed" : "success",
+          meta: {
+            session,
+            symbols: (process.env.WORKER_SYMBOLS || "SPY,QQQ").split(",").map((s) => s.trim()),
+            duration_ms: Date.now() - t0,
+            noop: session === "closed",
+            source: "start.mjs",
+          },
+        };
+        const { error: scanErr } = await sb.from("scan_jobs").upsert(scanRow, { onConflict: "job_name,window_start" });
+        if (scanErr) console.error("[scan_run] upsert FAIL", scanErr.message);
+        else console.log("[scan_run] upsert OK", now);
+        const hbRow = {
           job_name: "heartbeat_worker",
           window_start: now,
           status: "success",
           meta: { source: "start.mjs", note: "post-main heartbeat", session },
         };
-        const { error } = await sb.from("scan_jobs").upsert(row, { onConflict: "job_name,window_start" });
+        const { error } = await sb.from("scan_jobs").upsert(hbRow, { onConflict: "job_name,window_start" });
         if (error) console.error("[heartbeat] upsert FAIL", error.message);
         else console.log("[heartbeat] upsert OK", now);
       } else {
