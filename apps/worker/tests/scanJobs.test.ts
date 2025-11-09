@@ -1,4 +1,4 @@
-import type { MassiveClient } from "@fancytrader/shared/cjs";
+import type { MassiveClient } from "@fancytrader/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   __resetMassiveClientForTests,

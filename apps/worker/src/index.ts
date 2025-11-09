@@ -1,4 +1,6 @@
-import { MassiveClient, marketToMode } from "@fancytrader/shared/cjs";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
+import { MassiveClient, marketToMode } from "@fancytrader/shared";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 type ScanMode = "premarket" | "regular" | "aftermarket" | "closed";
@@ -126,7 +128,11 @@ export const __resetSupabaseClientForTests = (): void => {
   supabase = null;
 };
 
-if (require.main === module) {
+const isDirectRun = process.argv[1]
+  ? pathToFileURL(resolve(process.argv[1])).href === import.meta.url
+  : false;
+
+if (isDirectRun) {
   main().catch((error) => {
     console.error("Worker failed", error);
     process.exit(1);
