@@ -1,0 +1,7 @@
+{
+  "version": 1,
+  "steps": [
+    { "id": "firstRun", "label": "Welcome", "actions": ["dismiss"] },
+    { "id": "backendCheck", "label": "Backend Check", "actions": ["openBackendTest", "openSetupGuide"] }
+  ]
+}

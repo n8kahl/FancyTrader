@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "steps": [
+    { "id": "browse", "label": "Watchlist", "actions": ["openManager", "add", "remove"] },
+    { "id": "bulk", "label": "Bulk Actions", "actions": ["bulkEnable", "bulkDisable"] }
+  ],
+  "flags": { "bulkEnable": true, "bulkDisable": true }
+}

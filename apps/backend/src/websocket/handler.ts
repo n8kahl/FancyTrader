@@ -1,4 +1,5 @@
 import { WebSocketServer } from "ws";
+import type { IncomingMessage } from "http";
 import type { RawData, WebSocket } from "ws";
 import type { ServerOutbound } from "@fancytrader/shared/cjs";
 import { z } from "zod";
@@ -7,6 +8,7 @@ import { PolygonStreamingService } from "../services/polygonStreamingService";
 import { StrategyDetectorService } from "../services/strategyDetector";
 import { logger } from "../utils/logger";
 import { onWsConnect, onWsDisconnect } from "../utils/metrics";
+import { isAllowedOrigin } from "../security/wsGuard";
 
 interface ClientMeta {
   subscribedSymbols: Set<string>;
@@ -86,7 +88,14 @@ export function setupWebSocketHandler(
     clearInterval(heartbeatInterval);
   });
 
-  wss.on("connection", (ws: WebSocket) => {
+  wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+    const originHeader = req.headers["origin"];
+    const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
+    if (!isAllowedOrigin(origin)) {
+      logger.warn("Blocked WebSocket origin", { origin });
+      ws.close(1008, "origin not allowed");
+      return;
+    }
     logger.info("New WebSocket client connected");
     onWsConnect();
 

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "presets",
+      "label": "Presets",
+      "actions": ["applyPresetKCU", "applyPresetMomentum", "applyPresetSwing"]
+    },
+    { "id": "library", "label": "Library", "actions": ["save", "cancel"] }
+  ],
+  "flags": {
+    "applyPresetKCU": true,
+    "applyPresetMomentum": true,
+    "applyPresetSwing": true
+  }
+}

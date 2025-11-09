@@ -27,6 +27,15 @@ import {
   type StrategyCategory,
 } from "../config/strategies";
 
+import { getStrategyActions } from "../flows/strategiesFlow";
+import type { StrategiesActionId } from "../flows/strategies_flow.schema";
+
+const PRESET_ACTION_TO_ID: Partial<Record<StrategiesActionId, string>> = {
+  applyPresetKCU: "kcu_only",
+  applyPresetMomentum: "momentum",
+  applyPresetSwing: "swing_trading",
+};
+
 interface StrategySettingsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,6 +50,9 @@ export function StrategySettings({
   onStrategiesChange,
 }: StrategySettingsProps) {
   const [localEnabled, setLocalEnabled] = useState<string[]>(enabledStrategies);
+
+  const presetActions = getStrategyActions("presets");
+  const libraryActions = getStrategyActions("library");
 
   const isStrategyEnabled = (id: string): boolean => localEnabled.includes(id);
 
@@ -58,6 +70,31 @@ export function StrategySettings({
       setLocalEnabled(preset.enabledStrategies);
     }
   };
+
+  const presetButtons = presetActions
+    .map((action) => {
+      const presetId = PRESET_ACTION_TO_ID[action];
+      if (!presetId) return null;
+      const preset = STRATEGY_PRESETS.find((p) => p.id === presetId);
+      if (!preset) return null;
+      return (
+        <Button
+          key={action}
+          variant="outline"
+          size="sm"
+          onClick={() => applyPreset(presetId)}
+          className="justify-start h-auto py-2 px-3"
+        >
+          <div className="text-left">
+            <p className="text-xs">{preset.name}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {preset.enabledStrategies.length} strategies
+            </p>
+          </div>
+        </Button>
+      );
+    })
+    .filter(Boolean) as JSX.Element[];
 
   const handleSave = (): void => {
     onStrategiesChange(localEnabled);
@@ -174,22 +211,24 @@ export function StrategySettings({
           <div className="mb-6 p-4 rounded-lg bg-muted/30 border border-border/30">
             <h3 className="text-sm mb-3">Quick Presets</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {STRATEGY_PRESETS.map((preset) => (
-                <Button
-                  key={preset.id}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => applyPreset(preset.id)}
-                  className="justify-start h-auto py-2 px-3"
-                >
-                  <div className="text-left">
-                    <p className="text-xs">{preset.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {preset.enabledStrategies.length} strategies
-                    </p>
-                  </div>
-                </Button>
-              ))}
+              {presetButtons.length > 0
+                ? presetButtons
+                : STRATEGY_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.id}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => applyPreset(preset.id)}
+                      className="justify-start h-auto py-2 px-3"
+                    >
+                      <div className="text-left">
+                        <p className="text-xs">{preset.name}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {preset.enabledStrategies.length} strategies
+                        </p>
+                      </div>
+                    </Button>
+                  ))}
             </div>
           </div>
 
@@ -239,13 +278,17 @@ export function StrategySettings({
             {localEnabled.length} strategies enabled
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700">
-              <Check className="w-4 h-4 mr-2" />
-              Save Changes
-            </Button>
+            {libraryActions.includes("cancel") && (
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+            )}
+            {libraryActions.includes("save") && (
+              <Button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-700">
+                <Check className="w-4 h-4 mr-2" />
+                Save Changes
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

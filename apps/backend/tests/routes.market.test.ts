@@ -6,6 +6,7 @@ import { createApp } from "../src/app";
 import { AlertRegistry } from "../src/alerts/registry";
 import { defaultStrategyParams } from "../src/config/strategy.defaults";
 import type { SupabaseService } from "../src/services/supabaseService";
+import type { SupabaseSetupsService } from "../src/services/supabaseSetups";
 import type { StrategyDetectorService } from "../src/services/strategyDetector";
 import type { PolygonStreamingService } from "../src/services/polygonStreamingService";
 import { PolygonClient } from "../src/services/polygonClient";
@@ -18,6 +19,12 @@ const buildMockServices = (): AppServices => {
     getSetups: jest.fn().mockResolvedValue([]),
     deleteSetup: jest.fn().mockResolvedValue(undefined),
   } as unknown as SupabaseService;
+
+  const supabaseSetups = {
+    listSetups: jest.fn().mockResolvedValue([]),
+    saveSetup: jest.fn().mockResolvedValue(undefined),
+    deleteSetup: jest.fn().mockResolvedValue(undefined),
+  } as unknown as SupabaseSetupsService;
 
   const strategyDetector = {
     updateParams: jest.fn(),
@@ -37,6 +44,7 @@ const buildMockServices = (): AppServices => {
 
   return {
     supabaseService,
+    supabaseSetups,
     strategyDetector,
     polygonService,
     alertRegistry: new AlertRegistry(),
@@ -44,7 +52,7 @@ const buildMockServices = (): AppServices => {
 };
 
 describe("market + options routes", () => {
-  const polygonApi = "https://api.polygon.io";
+  const polygonApi = "https://api.massive.com";
   const services = buildMockServices();
   const { app } = createApp({ services });
 
@@ -61,15 +69,26 @@ describe("market + options routes", () => {
     nock.enableNetConnect();
   });
 
-  it("returns the Polygon market status payload", async () => {
+  it.each([
+    { market: "pre", expected: "premarket" },
+    { market: "open", expected: "regular" },
+    { market: "after", expected: "aftermarket" },
+    { market: "closed", expected: "closed" },
+  ])("normalizes %s session", async ({ market, expected }) => {
     nock(polygonApi)
       .get("/v1/marketstatus/now")
       .query({ apiKey: "test_key" })
-      .reply(200, { market: "open", serverTime: "2024-05-01T14:00:00Z" });
+      .reply(200, { market, next_open: "2024-05-02T13:30:00Z", next_close: "2024-05-02T20:00:00Z" });
 
     const res = await request(app).get("/api/market/status");
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ market: "open", serverTime: "2024-05-01T14:00:00Z" });
+    expect(res.body).toMatchObject({
+      session: expected,
+      nextOpen: "2024-05-02T13:30:00Z",
+      nextClose: "2024-05-02T20:00:00Z",
+      source: "massive",
+    });
+    expect(res.body.raw).toEqual({ market, next_open: "2024-05-02T13:30:00Z", next_close: "2024-05-02T20:00:00Z" });
   });
 
   it("normalizes snapshot responses", async () => {

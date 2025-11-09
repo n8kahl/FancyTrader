@@ -7,6 +7,7 @@ import { TradeListItem } from "./components/TradeListItem";
 import { TradeDetailsModal } from "./components/TradeDetailsModal";
 import { DiscordAlertDialog } from "./components/DiscordAlertDialog";
 import { MarketPhaseIndicator } from "./components/MarketPhaseIndicator";
+import { SessionIndicator } from "./components/SessionIndicator";
 import { StrategySettings } from "./components/StrategySettings";
 import { WatchlistManager } from "./components/WatchlistManager";
 import { OptionsContractSelector } from "./components/OptionsContractSelector";
@@ -26,7 +27,10 @@ import {
   LayoutGrid,
   List,
   Settings,
-  ListPlus,
+  Plus,
+  MinusCircle,
+  ToggleLeft,
+  ToggleRight,
   Sun,
   Moon,
   Wifi,
@@ -49,6 +53,12 @@ import { displayWelcomeMessage } from "./utils/welcomeMessage";
 import { logger } from "./utils/logger";
 import { getMode, isDev, getBackendUrl, getBackendWsUrl } from "./utils/env";
 import { DIAGNOSTICS_ENABLED } from "@/flags";
+import { runAction, type RunActionDeps } from "./flows/_shared/interaction";
+import { getWatchlistActions } from "./flows/watchlistFlow";
+import type { WatchlistActionId } from "./flows/watchlist_flow.schema";
+import { getOnboardingActions } from "./flows/onboardingFlow";
+import type { OnboardActionId } from "./flows/onboarding_flow.schema";
+
 import type { TradeLite, WatchlistItem } from "@fancytrader/shared";
 
 // Mock trade data with new confluence system (fallback)
@@ -138,6 +148,10 @@ export default function App({ backendDeps }: AppProps = {}) {
   const [showWatchlistManager, setShowWatchlistManager] = useState(false);
   const [showBackendTest, setShowBackendTest] = useState(false);
   const [useMockData, setUseMockData] = useState(false);
+  const [showSetupGuide, setShowSetupGuide] = useState(false);
+  const [dismissedFlows, setDismissedFlows] = useState(() => ({
+    onboarding: typeof window !== "undefined" && localStorage.getItem("dismissed:onboarding") === "1",
+  }));
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const saved = localStorage.getItem("kcu-theme");
     return saved ? saved === "dark" : true; // Default to dark
@@ -323,8 +337,111 @@ const activeTrades: UiTrade[] = trades
   )
   .map(toUiTrade);
 
+  const watchlistBrowseActions = getWatchlistActions("browse");
+  const watchlistBulkActions = getWatchlistActions("bulk");
+  const onboardingFirstRunActions = getOnboardingActions("firstRun");
+  const onboardingBackendActions = getOnboardingActions("backendCheck");
+
+  const findTradeById = (tradeId: string): Trade | undefined =>
+    trades.find((tradeItem) => tradeItem.id === tradeId);
+
+  const appendAlertToTrade = (tradeId: string, alert: TradeAlert) => {
+    setTrades((prev) =>
+      prev.map((t) =>
+        t.id === tradeId ? { ...t, alertHistory: [...(t.alertHistory ?? []), alert] } : t
+      )
+    );
+    setTradeProgressTrade((prev) =>
+      prev?.id === tradeId ? { ...prev, alertHistory: [...(prev.alertHistory ?? []), alert] } : prev
+    );
+  };
+
   const handleSendAlert = (trade: Trade) => {
     setAlertTrade(trade);
+  };
+
+  const requestWatchlistSymbol = (message: string): string | null => {
+    if (typeof window === "undefined") return null;
+    const value = window.prompt(message);
+    return value ? value.trim().toUpperCase() : null;
+  };
+
+  const addSymbolToWatchlist = async (symbol: string) => {
+    const normalized = symbol.trim().toUpperCase();
+    if (!normalized) return;
+    if (watchlist.some((entry) => entry.symbol === normalized)) {
+      toast.info(`${normalized} is already on your watchlist`);
+      return;
+    }
+    try {
+      await apiClient.addToWatchlist(normalized);
+      const entry: WatchlistEntry = {
+        symbol: normalized,
+        name: normalized,
+        isActive: true,
+        addedAt: new Date().toISOString(),
+      };
+      setWatchlist((prev) => [...prev, entry]);
+      toast.success(`Added ${normalized} to watchlist`);
+    } catch (error) {
+      logger.error("Failed to add watchlist symbol", error);
+      toast.error(`Unable to add ${normalized}`);
+    }
+  };
+
+  const removeSymbolFromWatchlist = async (symbol: string) => {
+    const normalized = symbol.trim().toUpperCase();
+    if (!normalized) return;
+    if (!watchlist.some((entry) => entry.symbol === normalized)) {
+      toast.info(`${normalized} is not on your watchlist`);
+      return;
+    }
+    try {
+      await apiClient.removeFromWatchlist(normalized);
+      setWatchlist((prev) => prev.filter((entry) => entry.symbol !== normalized));
+      toast.success(`Removed ${normalized} from watchlist`);
+    } catch (error) {
+      logger.error("Failed to remove watchlist symbol", error);
+      toast.error(`Unable to remove ${normalized}`);
+    }
+  };
+
+  const handleWatchlistAction = async (action: WatchlistActionId) => {
+    switch (action) {
+      case "openManager":
+        setShowWatchlistManager(true);
+        return;
+      case "add": {
+        const symbol = requestWatchlistSymbol("Enter a symbol to add to your watchlist");
+        if (symbol) {
+          await addSymbolToWatchlist(symbol);
+        }
+        return;
+      }
+      case "remove": {
+        const symbol = requestWatchlistSymbol("Enter a symbol to remove from your watchlist");
+        if (symbol) {
+          await removeSymbolFromWatchlist(symbol);
+        }
+        return;
+      }
+      case "bulkEnable":
+      case "bulkDisable": {
+        const next = action === "bulkEnable";
+        setWatchlist((prev) => prev.map((entry) => ({ ...entry, isActive: next })));
+        toast.success(next ? "Enabled all watchlist symbols" : "Disabled all watchlist symbols");
+        return;
+      }
+      default:
+        return;
+    }
+  };
+
+  const dismissFlow = (key: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(`dismissed:${key}`, "1");
+    }
+    setDismissedFlows((prev) => ({ ...prev, [key]: true }));
   };
 
   const mapAlertTypeToShareType = (type: AlertType):
@@ -355,6 +472,53 @@ const activeTrades: UiTrade[] = trades
       case "CUSTOM":
       default:
         return "CUSTOM";
+    }
+  };
+
+  const shareTradeAlert = async (
+    trade: Trade,
+    type: AlertType,
+    message: string,
+    extra?: Partial<TradeAlert>,
+  ) => {
+    await apiClient.shareCustomDiscord({
+      symbol: trade.symbol,
+      type: mapAlertTypeToShareType(type),
+      content: message,
+    });
+
+    const alert: TradeAlert = {
+      id: `alert-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      type,
+      message,
+      template: message,
+      contractPrice: trade.position?.currentPremium,
+      ...extra,
+    };
+
+    appendAlertToTrade(trade.id, alert);
+
+    return alert;
+  };
+
+  const handlePresetDiscordAction = async (
+    tradeId: string,
+    subtype: string,
+    text?: string,
+  ) => {
+    const trade = findTradeById(tradeId);
+    if (!trade) {
+      toast.error("Unable to locate that trade");
+      return;
+    }
+    try {
+      await shareTradeAlert(trade, subtype as AlertType, text ?? `${trade.symbol} ${subtype}`);
+      toast.success(`Discord alert sent for ${trade.symbol}`, {
+        description: `Alert type: ${subtype}`,
+      });
+    } catch (error) {
+      handleDiscordError(error);
     }
   };
 
@@ -390,11 +554,7 @@ const activeTrades: UiTrade[] = trades
       contractPrice: alertTrade.position?.currentPremium,
     };
 
-    setTrades((prev) =>
-      prev.map((t) =>
-        t.id === alertTrade.id ? { ...t, alertHistory: [...t.alertHistory, alert] } : t
-      )
-    );
+    appendAlertToTrade(alertTrade.id, alert);
 
     toast.success(`Discord alert sent for ${alertTrade.symbol}`, {
       description: `Channel: ${payload.channel}`,
@@ -453,37 +613,14 @@ const activeTrades: UiTrade[] = trades
     if (!tradeProgressTrade) return;
 
     try {
-      await apiClient.shareCustomDiscord({
-        symbol: tradeProgressTrade.symbol,
-        type: mapAlertTypeToShareType(type),
-        content: message,
+      await shareTradeAlert(tradeProgressTrade, type, message, {
+        profitLoss: data?.profitLoss,
+        profitLossPercent: data?.profitLossPercent,
       });
     } catch (error) {
       handleDiscordError(error);
+      return;
     }
-
-    const alert: TradeAlert = {
-      id: `alert-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      type,
-      message,
-      contractPrice: tradeProgressTrade.position?.currentPremium,
-      profitLoss: data?.profitLoss,
-      profitLossPercent: data?.profitLossPercent,
-    };
-
-    // Update trade with new alert
-    setTrades((prev) =>
-      prev.map((t) =>
-        t.id === tradeProgressTrade.id ? { ...t, alertHistory: [...t.alertHistory, alert] } : t
-      )
-    );
-
-    // Update the tradeProgressTrade state so the modal reflects the new alert
-    setTradeProgressTrade((prev) => {
-      if (!prev) return null;
-      return { ...prev, alertHistory: [...prev.alertHistory, alert] };
-    });
 
     toast.success(`Discord alert sent for ${tradeProgressTrade.symbol}`, {
       description: `Alert type: ${type}`,
@@ -527,6 +664,77 @@ const activeTrades: UiTrade[] = trades
         onSendAlert={handleSendAlert}
       />
     );
+  };
+
+  const flowDeps: RunActionDeps = {
+    openManageTrade: (tradeId) => {
+      const trade = findTradeById(tradeId);
+      if (trade) {
+        setTradeProgressTrade(trade);
+      }
+    },
+    openDetails: (tradeId) => {
+      const trade = findTradeById(tradeId);
+      if (trade) {
+        setSelectedTrade(trade);
+      }
+    },
+    openWatchlistManager: () => setShowWatchlistManager(true),
+    openStrategySettings: () => setShowStrategySettings(true),
+    sendDiscordCustom: async (tradeId) => {
+      const trade = findTradeById(tradeId);
+      if (trade) {
+        setAlertTrade(trade);
+      }
+    },
+    sendDiscordType: async (tradeId, subtype, text) => {
+      await handlePresetDiscordAction(tradeId, subtype, text);
+    },
+    openBackendTest: () => setShowBackendTest(true),
+    openSetupGuide: () => setShowSetupGuide(true),
+    dismiss: (key) => dismissFlow(key),
+  };
+
+  const renderWatchlistActionButton = (action: WatchlistActionId): JSX.Element | null => {
+    switch (action) {
+      case "openManager":
+        return (
+          <Button variant="outline" size="sm" key="watchlist-open" onClick={() => setShowWatchlistManager(true)}>
+            <List className="w-4 h-4 mr-2" />
+            Watchlist
+          </Button>
+        );
+      case "add":
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            key="watchlist-add"
+            onClick={() => {
+              void handleWatchlistAction("add");
+            }}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Symbol
+          </Button>
+        );
+      case "remove":
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            key="watchlist-remove"
+            onClick={() => {
+              void handleWatchlistAction("remove");
+            }}
+          >
+            <MinusCircle className="w-4 h-4 mr-2" />
+            Remove
+          </Button>
+        );
+      default:
+        return null;
+    }
   };
 
   const handleDismissTrade = (tradeId: string) => {
@@ -641,10 +849,7 @@ const activeTrades: UiTrade[] = trades
                 <Activity className="w-4 h-4 mr-2" />
                 Test
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowWatchlistManager(true)}>
-                <ListPlus className="w-4 h-4 mr-2" />
-                Watchlist
-              </Button>
+              {watchlistBrowseActions.map((action) => renderWatchlistActionButton(action))}
               <Button variant="outline" size="sm" onClick={() => setShowStrategySettings(true)}>
                 <Settings className="w-4 h-4 mr-2" />
                 Strategies
@@ -657,6 +862,7 @@ const activeTrades: UiTrade[] = trades
               >
                 {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
               </Button>
+              <SessionIndicator mock={useMockData} />
               <MarketPhaseIndicator />
             </div>
           </div>
@@ -709,6 +915,48 @@ const activeTrades: UiTrade[] = trades
             />
           )}
 
+          {!dismissedFlows.onboarding && (
+            <div className="rounded-lg border border-border/50 bg-card/40 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="font-medium">Welcome to Fancy Trader</p>
+                  <p className="text-sm text-muted-foreground">Sync your backend before trading live data.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {onboardingBackendActions.includes("openBackendTest") && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => runAction("openBackendTest", {}, flowDeps)}
+                    >
+                      <Activity className="w-4 h-4 mr-2" />
+                      Backend Test
+                    </Button>
+                  )}
+                  {onboardingBackendActions.includes("openSetupGuide") && (
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => runAction("openSetupGuide", {}, flowDeps)}
+                    >
+                      <List className="w-4 h-4 mr-2" />
+                      Setup Guide
+                    </Button>
+                  )}
+                  {onboardingFirstRunActions.includes("dismiss") && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => runAction("dismiss", { key: "onboarding" }, flowDeps)}
+                    >
+                      Dismiss
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="all" className="flex items-center gap-2">
@@ -744,6 +992,28 @@ const activeTrades: UiTrade[] = trades
             </TabsList>
 
             <TabsContent value={activeTab} className="space-y-4">
+              {activeTab === "watchlist" && watchlistBulkActions.length > 0 && (
+                <div className="rounded-lg border border-border/50 bg-card/40 p-3 flex flex-wrap gap-2">
+                  {watchlistBulkActions.map((action) => (
+                    <Button
+                      key={action}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        void handleWatchlistAction(action);
+                      }}
+                    >
+                      {action === "bulkEnable" ? (
+                        <ToggleRight className="w-4 h-4 mr-2" />
+                      ) : (
+                        <ToggleLeft className="w-4 h-4 mr-2" />
+                      )}
+                      {action === "bulkEnable" ? "Enable All" : "Disable All"}
+                    </Button>
+                  ))}
+                </div>
+              )}
+
               {filteredTrades.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -805,6 +1075,20 @@ const activeTrades: UiTrade[] = trades
         onWatchlistChange={setWatchlist}
       />
 
+      {showSetupGuide && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full max-h-[90vh] overflow-auto space-y-4">
+            <BackendSetupGuide
+              onSwitchToMock={() => setUseMockData(true)}
+              onDismiss={() => setShowSetupGuide(false)}
+            />
+            <div className="flex justify-end">
+              <Button onClick={() => setShowSetupGuide(false)}>Close</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Backend Connection Test Modal */}
       {showBackendTest && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
@@ -837,6 +1121,7 @@ const activeTrades: UiTrade[] = trades
           onSendAlert={handleSendProgressAlert}
           onUpdateTradeState={handleUpdateTradeState}
           onDismissTrade={handleDismissTrade}
+          actionDeps={flowDeps}
         />
       )}
 

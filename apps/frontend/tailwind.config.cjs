@@ -10,6 +10,11 @@ module.exports = {
     },
     extend: {
       colors: {
+        fg: "var(--color-fg)",
+        bg: "var(--color-bg)",
+        brand: "var(--color-brand)",
+        success: "var(--color-success)",
+        danger: "var(--color-danger)",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -28,7 +33,7 @@ module.exports = {
           foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
-          DEFAULT: "hsl(var(--muted))",
+          DEFAULT: "var(--color-muted)",
           foreground: "hsl(var(--muted-foreground))",
         },
         accent: {
@@ -45,9 +50,19 @@ module.exports = {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "var(--radius-lg)",
+        md: "var(--radius-md)",
+        sm: "var(--radius-sm)",
+      },
+      spacing: {
+        1: "var(--space-1)",
+        2: "var(--space-2)",
+        3: "var(--space-3)",
+        4: "var(--space-4)",
+      },
+      fontFamily: {
+        sans: "var(--font-body)",
+        mono: "var(--font-mono)",
       },
       keyframes: {
         "accordion-down": {

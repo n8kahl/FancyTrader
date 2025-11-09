@@ -1,3 +1,5 @@
+import client from "prom-client";
+
 export interface Counters {
   http: Record<string, number>;
   ws: { connected: number; totalConnections: number };
@@ -12,15 +14,28 @@ export const metrics: Counters = {
   startedAt: Date.now(),
 };
 
+export const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+export const httpRequests = new client.Counter({
+  name: "http_requests_total",
+  help: "HTTP requests by route, method, and status",
+  labelNames: ["route", "method", "status"] as const,
+});
+register.registerMetric(httpRequests);
+
+const normalizePath = (path: string): string => path.replace(/:\w+/g, ":param");
+
 const httpKey = (method: string, path: string): string => {
   const normalMethod = method.toUpperCase();
-  const normalizedPath = path.replace(/\:\w+/g, ":param");
+  const normalizedPath = normalizePath(path);
   return `${normalMethod}_${normalizedPath}`;
 };
 
-export function incHttp(method: string, path: string): void {
+export function incHttp(method: string, path: string, status = 200): void {
   const key = httpKey(method, path);
   metrics.http[key] = (metrics.http[key] ?? 0) + 1;
+  httpRequests.inc({ route: normalizePath(path), method: method.toUpperCase(), status: String(status) });
 }
 
 export function onWsConnect(): void {

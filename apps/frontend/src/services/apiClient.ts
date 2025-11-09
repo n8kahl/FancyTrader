@@ -117,6 +117,14 @@ const healthSchema = z.object({
   uptimeSec: z.number(),
 });
 
+const marketSessionSchema = z.object({
+  session: z.enum(["premarket", "regular", "aftermarket", "closed"]),
+  nextOpen: z.string().nullable().optional(),
+  nextClose: z.string().nullable().optional(),
+  source: z.string(),
+  raw: z.unknown().optional(),
+});
+
 const tradeLiteSchema = z.object({
   id: z.string(),
   symbol: z.string(),
@@ -406,8 +414,9 @@ class ApiClient {
   /**
    * Get market status
    */
-  async getMarketStatus(): Promise<unknown> {
-    return this.fetch<unknown>(API_ENDPOINTS.getMarketStatus());
+  async getMarketStatus(): Promise<z.infer<typeof marketSessionSchema>> {
+    const response = await this.fetch<unknown>(API_ENDPOINTS.getMarketStatus());
+    return marketSessionSchema.parse(response);
   }
 
   // ============================================
@@ -798,3 +807,5 @@ function resolveSnapshotValues(data: SnapshotData): { price: number; time: numbe
 }
 
 export const apiClient = new ApiClient();
+
+export type MarketSessionResponse = z.infer<typeof marketSessionSchema>;

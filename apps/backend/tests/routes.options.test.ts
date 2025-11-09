@@ -5,6 +5,7 @@ import { createApp } from "../src/app";
 import { AlertRegistry } from "../src/alerts/registry";
 import { defaultStrategyParams } from "../src/config/strategy.defaults";
 import type { SupabaseService } from "../src/services/supabaseService";
+import type { SupabaseSetupsService } from "../src/services/supabaseSetups";
 import type { StrategyDetectorService } from "../src/services/strategyDetector";
 import type { PolygonStreamingService } from "../src/services/polygonStreamingService";
 
@@ -16,6 +17,12 @@ const buildMockServices = (): AppServices => {
     getSetups: jest.fn().mockResolvedValue([]),
     deleteSetup: jest.fn().mockResolvedValue(undefined),
   } as unknown as SupabaseService;
+
+  const supabaseSetups = {
+    listSetups: jest.fn().mockResolvedValue([]),
+    saveSetup: jest.fn().mockResolvedValue(undefined),
+    deleteSetup: jest.fn().mockResolvedValue(undefined),
+  } as unknown as SupabaseSetupsService;
 
   const strategyDetector = {
     updateParams: jest.fn(),
@@ -35,6 +42,7 @@ const buildMockServices = (): AppServices => {
 
   return {
     supabaseService,
+    supabaseSetups,
     strategyDetector,
     polygonService,
     alertRegistry: new AlertRegistry(),
@@ -42,7 +50,7 @@ const buildMockServices = (): AppServices => {
 };
 
 describe("options routes", () => {
-  const polygonApi = "https://api.polygon.io";
+  const polygonApi = "https://api.massive.com";
   const services = buildMockServices();
   const { app } = createApp({ services });
 

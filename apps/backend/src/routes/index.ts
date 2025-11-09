@@ -9,12 +9,14 @@ import { setupShareRoutes } from "./share";
 import { setupTradesRoutes } from "./trades";
 import { setupChartAnnotationsRoutes } from "./chartAnnotations";
 import { SupabaseService } from "../services/supabaseService";
+import { SupabaseSetupsService } from "../services/supabaseSetups";
 import { StrategyDetectorService } from "../services/strategyDetector";
 import { PolygonStreamingService } from "../services/polygonStreamingService";
 import { AlertRegistry } from "../alerts/registry";
 
 interface Services {
   supabaseService: SupabaseService;
+  supabaseSetups: SupabaseSetupsService;
   strategyDetector: StrategyDetectorService;
   polygonService: PolygonStreamingService;
   alertRegistry: AlertRegistry;

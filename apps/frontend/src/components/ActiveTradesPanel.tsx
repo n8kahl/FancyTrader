@@ -1,4 +1,4 @@
-import { X, Edit3, TrendingUp, TrendingDown, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
@@ -58,33 +58,6 @@ export function ActiveTradesPanel({
                     >
                       {trade.tradeState}
                     </Badge>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onManageTrade(trade);
-                      }}
-                      aria-label="Edit/Manage trade"
-                      title="Edit/Manage trade"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                      aria-label="Close"
-                      title="Close"
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
                   </div>
                 </div>
 

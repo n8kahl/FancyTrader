@@ -23,11 +23,9 @@ describe("ConnectionStatus", () => {
 
   it("hides when banner disabled", () => {
     const original = import.meta.env.VITE_STATUS_BANNER;
-    // @ts-expect-error override during test
     import.meta.env.VITE_STATUS_BANNER = "0";
     const { container } = render(<ConnectionStatus state="connecting" />);
     expect(container.firstChild).toBeNull();
-    // @ts-expect-error restore after test
     import.meta.env.VITE_STATUS_BANNER = original;
   });
 });

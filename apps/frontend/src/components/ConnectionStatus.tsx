@@ -50,7 +50,7 @@ export function ConnectionStatus(props: {
   const showRetry = state === "offline" || state === "error" || state === "closed";
 
   return (
-    <div className={`w-full ${bgFor(state)} text-white text-sm`}>
+    <div className={`w-full ${bgFor(state)} text-white text-sm`} data-testid="connection-status-banner">
       <div className="mx-auto max-w-6xl px-3 py-1.5 flex items-center gap-2">
         <span className="font-medium">{labelFor(state)}</span>
         {reason ? <span className="opacity-80">— {reason}</span> : null}

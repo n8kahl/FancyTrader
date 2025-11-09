@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { EventEmitter } from "events";
+import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
 import { setupWebSocketHandler } from "../src/websocket/handler";
 import type { PolygonStreamingService } from "../src/services/polygonStreamingService";
@@ -25,9 +26,10 @@ class MockWebSocket extends EventEmitter {
 class MockWebSocketServer extends EventEmitter {
   public clients = new Set<MockWebSocket>();
 
-  simulateConnection(client: MockWebSocket): void {
+  simulateConnection(client: MockWebSocket, origin = "http://localhost:5173"): void {
     this.clients.add(client);
-    this.emit("connection", client);
+    const req = { headers: { origin } } as unknown as IncomingMessage;
+    this.emit("connection", client, req);
   }
 
   close(): void {

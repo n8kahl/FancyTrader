@@ -1,5 +1,6 @@
 import { Express, Request, Router } from "express";
 import type { SupabaseService } from "../services/supabaseService";
+import { writeLimiter } from "../middleware/rateLimit";
 import type { StrategyDetectorService } from "../services/strategyDetector";
 import type { PolygonStreamingService } from "../services/polygonStreamingService";
 import { WatchlistSymbol } from "../types";
@@ -83,6 +84,7 @@ export function setupWatchlistRoutes(app: Express, services: Services): void {
    */
   compatibilityRouter.post(
     "/",
+    writeLimiter,
     asyncHandler(async (req, res) => {
       const userId = resolveUserId(req);
       if (!userId) {
@@ -111,6 +113,7 @@ export function setupWatchlistRoutes(app: Express, services: Services): void {
    */
   compatibilityRouter.delete(
     "/:symbol",
+    writeLimiter,
     asyncHandler(async (req, res) => {
       const userId = resolveUserId(req);
       if (!userId) {
@@ -147,6 +150,7 @@ export function setupWatchlistRoutes(app: Express, services: Services): void {
    */
   app.post(
     "/api/watchlist/:userId",
+    writeLimiter,
     asyncHandler(async (req, res) => {
       const { userId } = userIdParamSchema.parse(req.params);
       const { watchlist } = watchlistBodySchema.parse(req.body);
@@ -161,6 +165,7 @@ export function setupWatchlistRoutes(app: Express, services: Services): void {
    */
   app.put(
     "/api/watchlist/:userId/add",
+    writeLimiter,
     asyncHandler(async (req, res) => {
       const { userId } = userIdParamSchema.parse(req.params);
       const { symbols } = watchlistBulkSchema.parse(req.body);
@@ -184,6 +189,7 @@ export function setupWatchlistRoutes(app: Express, services: Services): void {
    */
   app.delete(
     "/api/watchlist/:userId/remove/:symbol",
+    writeLimiter,
     asyncHandler(async (req, res) => {
       const { userId } = userIdParamSchema.parse(req.params);
       const { symbol } = watchlistSymbolParamSchema.parse(req.params);

@@ -11,7 +11,9 @@
     "test": "vitest run",
     "format": "prettier --write src",
     "test:watch": "vitest",
-    "e2e": "playwright test --reporter=line"
+    "e2e": "playwright test --reporter=line",
+    "predev": "pnpm -w build:tokens",
+    "prebuild": "pnpm -w build:tokens"
   },
   "dependencies": {
     "@fancytrader/shared": "workspace:*",

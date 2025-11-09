@@ -5,6 +5,7 @@ import { createApp } from "../src/app";
 import { AlertRegistry } from "../src/alerts/registry";
 import { defaultStrategyParams } from "../src/config/strategy.defaults";
 import type { SupabaseService } from "../src/services/supabaseService";
+import type { SupabaseSetupsService } from "../src/services/supabaseSetups";
 import type { StrategyDetectorService } from "../src/services/strategyDetector";
 import type { PolygonStreamingService } from "../src/services/polygonStreamingService";
 import type { WatchlistSymbol } from "../src/types";
@@ -21,6 +22,12 @@ const buildServices = (): AppServices => {
     getSetups: jest.fn().mockResolvedValue([]),
     deleteSetup: jest.fn().mockResolvedValue(undefined),
   } as unknown as SupabaseService;
+
+  const supabaseSetups = {
+    listSetups: jest.fn().mockResolvedValue([]),
+    saveSetup: jest.fn().mockResolvedValue(undefined),
+    deleteSetup: jest.fn().mockResolvedValue(undefined),
+  } as unknown as SupabaseSetupsService;
 
   const strategyDetector = {
     updateParams: jest.fn(),
@@ -40,6 +47,7 @@ const buildServices = (): AppServices => {
 
   return {
     supabaseService,
+    supabaseSetups,
     strategyDetector,
     polygonService,
     alertRegistry: new AlertRegistry(),

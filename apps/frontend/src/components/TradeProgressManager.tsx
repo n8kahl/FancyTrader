@@ -27,6 +27,11 @@ import {
   ALERT_TEMPLATES,
 } from "../types/options";
 import { Textarea } from "./ui/textarea";
+import { getTradeActions } from "../flows/tradeFlow";
+import type { TradeFlowStepId, TradeActionId } from "../flows/trade_flow.schema";
+import { getAlertActions } from "../flows/alertsFlow";
+import type { AlertsActionId } from "../flows/alerts_flow.schema";
+import { runAction, type RunActionDeps } from "../flows/_shared/interaction";
 
 interface ActionPayload extends Record<string, unknown> {
   newStop?: number;
@@ -46,7 +51,9 @@ interface TradeProgressManagerProps {
   ) => void;
   onUpdateTradeState: (tradeId: string, newState: Trade["tradeState"]) => void;
   onDismissTrade?: (tradeId: string) => void;
+  actionDeps: RunActionDeps;
 }
+
 
 export function TradeProgressManager({
   open,
@@ -58,6 +65,7 @@ export function TradeProgressManager({
   onSendAlert,
   onUpdateTradeState,
   onDismissTrade,
+  actionDeps,
 }: TradeProgressManagerProps) {
   const conviction = trade.conviction ?? "MEDIUM";
   const stopPrice = trade.stop ?? trade.stopLoss ?? trade.entry ?? contract.strike;
@@ -65,6 +73,134 @@ export function TradeProgressManager({
   const [selectedAction, setSelectedAction] = useState<AlertType | null>(null);
   const [customMessage, setCustomMessage] = useState("");
   const [inputValue, setInputValue] = useState("");
+
+  const tradeStepId: TradeFlowStepId = (() => {
+    switch (trade.tradeState) {
+      case "SETUP":
+        return "selectSymbol";
+      case "LOADED":
+        return "setEntry";
+      case "ENTERED":
+        return "setStopsTargets";
+      default:
+        return "reviewConfirm";
+    }
+  })();
+
+  const tradeFlowActions = getTradeActions(tradeStepId);
+  const alertQuickActions = getAlertActions("quick");
+  const alertComposeActions = getAlertActions("compose");
+
+  const tradeActionLabels: Record<TradeActionId, string> = {
+    enter: "Enter",
+    trim25: "Trim 25%",
+    trim50: "Trim 50%",
+    add: "Add",
+    exitAll: "Exit All",
+    setStop: "Set Stop",
+    targetHit: "Mark Target Hit",
+    custom: "Custom Alert",
+  };
+
+  const handleTradeFlowAction = (action: TradeActionId) => {
+    switch (action) {
+      case "enter":
+        return runAction("openManageTrade", { tradeId: trade.id }, actionDeps);
+      case "trim25":
+        return runAction("sendDiscordType", {
+          tradeId: trade.id,
+          subtype: "TRIM_25",
+          text: "📊 Trim 25%",
+        }, actionDeps);
+      case "trim50":
+        return runAction("sendDiscordType", {
+          tradeId: trade.id,
+          subtype: "TRIM_50",
+          text: "📊 Trim 50%",
+        }, actionDeps);
+      case "add":
+        return runAction("sendDiscordType", {
+          tradeId: trade.id,
+          subtype: "ADD",
+          text: "➕ Adding to position",
+        }, actionDeps);
+      case "exitAll":
+        return runAction("sendDiscordType", {
+          tradeId: trade.id,
+          subtype: "EXIT_ALL",
+          text: "⛔ Exit all",
+        }, actionDeps);
+      case "setStop":
+      case "targetHit":
+        return runAction("openManageTrade", { tradeId: trade.id }, actionDeps);
+      case "custom":
+        return runAction("sendDiscordCustom", { tradeId: trade.id, text: "Custom alert" }, actionDeps);
+      default:
+        return undefined;
+    }
+  };
+
+  const alertActionLabels: Record<AlertsActionId, string> = {
+    custom: "Custom Message",
+    entry: "Entry",
+    trim25: "Trim 25%",
+    trim50: "Trim 50%",
+    add: "Add Size",
+    targetHit: "Target Hit",
+    stopLoss: "Adjust Stop",
+    exitAll: "Exit All",
+  };
+
+  const toAlertType = (action: AlertsActionId): AlertType => {
+    switch (action) {
+      case "custom":
+        return "CUSTOM";
+      case "entry":
+        return "ENTRY";
+      case "trim25":
+        return "TRIM_25";
+      case "trim50":
+        return "TRIM_50";
+      case "add":
+        return "ADD";
+      case "targetHit":
+        return "TARGET_HIT";
+      case "stopLoss":
+        return "STOP_ADJUST";
+      case "exitAll":
+        return "EXIT_ALL";
+      default:
+        return "CUSTOM";
+    }
+  };
+
+  const alertActionClass = (action: AlertsActionId): string => {
+    if (action === "exitAll") {
+      return "text-red-500 hover:text-red-600";
+    }
+    if (action === "targetHit") {
+      return "text-green-500";
+    }
+    return "";
+  };
+
+  const alertActionIcon = (action: AlertsActionId): JSX.Element | null => {
+    switch (action) {
+      case "trim25":
+      case "trim50":
+        return <Minus className="w-4 h-4 mr-2" />;
+      case "add":
+        return <Plus className="w-4 h-4 mr-2" />;
+      case "stopLoss":
+        return <Shield className="w-4 h-4 mr-2" />;
+      case "targetHit":
+        return <Target className="w-4 h-4 mr-2 text-green-500" />;
+      case "exitAll":
+        return <X className="w-4 h-4 mr-2" />;
+      default:
+        return null;
+    }
+  };
 
   // Calculate real-time P&L
   const profitColor = position.totalPL >= 0 ? "text-green-500" : "text-red-500";
@@ -213,87 +349,50 @@ export function TradeProgressManager({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex-1 overflow-hidden flex flex-col">
-              <h3 className="text-sm mb-3">Trade Actions</h3>
+            <div className="flex-1 overflow-hidden flex flex-col gap-4">
+            {tradeFlowActions.length > 0 && (
+              <div>
+                <h3 className="text-sm mb-3">Flow Actions</h3>
+                <div className="flex flex-wrap gap-2">
+                  {tradeFlowActions.map((action) => (
+                    <Button
+                      key={action}
+                      className="h-9 px-3 rounded-md bg-brand text-white"
+                      onClick={() => handleTradeFlowAction(action)}
+                    >
+                      {tradeActionLabels[action]}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex-1 min-h-0 flex flex-col">
+              <h3 className="text-sm mb-3">Alert Templates</h3>
               <ScrollArea className="flex-1">
                 <div className="space-y-2">
-                  {trade.tradeState === "LOADED" && (
+                  {alertQuickActions.map((action) => (
                     <Button
-                      variant="default"
-                      className="w-full justify-start bg-green-600 hover:bg-green-700"
-                      onClick={() => handleActionClick("ENTRY")}
+                      key={action}
+                      variant="outline"
+                      className={`w-full justify-start ${alertActionClass(action)}`}
+                      onClick={() => handleActionClick(toAlertType(action))}
                     >
-                      <TrendingUp className="w-4 h-4 mr-2" />
-                      Enter Position
+                      {alertActionIcon(action)}
+                      {alertActionLabels[action]}
+                    </Button>
+                  ))}
+
+                  {alertComposeActions.includes("custom") && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => handleActionClick("CUSTOM")}
+                    >
+                      <MessageSquare className="w-4 h-4 mr-2" />
+                      Custom Message
                     </Button>
                   )}
-
-                  {trade.tradeState !== "LOADED" && (
-                    <>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start"
-                        onClick={() => handleActionClick("TRIM_25")}
-                      >
-                        <Minus className="w-4 h-4 mr-2" />
-                        Trim 25% of Position
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start"
-                        onClick={() => handleActionClick("TRIM_50")}
-                      >
-                        <Minus className="w-4 h-4 mr-2" />
-                        Trim 50% of Position
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start"
-                        onClick={() => handleActionClick("ADD")}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add to Position
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start"
-                        onClick={() => handleActionClick("STOP_ADJUST")}
-                      >
-                        <Shield className="w-4 h-4 mr-2" />
-                        Adjust Stop Loss
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start"
-                        onClick={() => handleActionClick("TARGET_HIT")}
-                      >
-                        <Target className="w-4 h-4 mr-2 text-green-500" />
-                        Target Hit
-                      </Button>
-
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-red-500 hover:text-red-600"
-                        onClick={() => handleActionClick("EXIT_ALL")}
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Exit All
-                      </Button>
-                    </>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => handleActionClick("CUSTOM")}
-                  >
-                    <MessageSquare className="w-4 h-4 mr-2" />
-                    Custom Message
-                  </Button>
 
                   {onDismissTrade && (
                     <div className="pt-4 mt-4 border-t border-border/30">
@@ -303,7 +402,7 @@ export function TradeProgressManager({
                         onClick={() => {
                           if (
                             confirm(
-                              `Are you sure you want to dismiss this trade? This will remove ${trade.symbol} from your active trades.`
+                              `Are you sure you want to dismiss this trade? This will remove ${trade.symbol} from your active trades.`,
                             )
                           ) {
                             onDismissTrade(trade.id);
@@ -436,6 +535,7 @@ export function TradeProgressManager({
             )}
           </div>
         </div>
+      </div>
       </DialogContent>
     </Dialog>
   );

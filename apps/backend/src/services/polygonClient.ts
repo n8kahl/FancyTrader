@@ -1,10 +1,15 @@
-import axios, { AxiosInstance } from "axios";
+import axios from "axios";
 import { z } from "zod";
 import type { OptionContract } from "@fancytrader/shared/cjs";
 import { logger } from "../utils/logger";
 import { Bar } from "../types";
 import { followNextUrls, encodeCursor, decodeCursor, type PageShape } from "../utils/polygonPage";
 import { incPolygonRest } from "../utils/metrics";
+import { HttpClient } from "../utils/http";
+
+const MASSIVE_BASE_URL = "https://api.massive.com";
+const DEFAULT_USER_AGENT = process.env.HTTP_USER_AGENT ?? "FancyTrader-Backend/1.0";
+
 
 const aggregateSchema = z.object({
   t: z.number(),
@@ -55,8 +60,16 @@ const chainPagedResponseSchema = z.object({
 });
 
 const logError = (context: string, error: unknown): void => {
-  const message = error instanceof Error ? error.message : String(error);
-  logger.error(`${context}:`, message);
+  logger.error(
+    {
+      context,
+      err:
+        error instanceof Error
+          ? { message: error.message, stack: error.stack }
+          : { message: String(error) },
+    },
+    "PolygonClient error"
+  );
 };
 
 const mapAggregate = (symbol: string, agg: z.infer<typeof aggregateSchema>): Bar => ({
@@ -97,13 +110,15 @@ const mapChainRow = (row: z.infer<typeof chainRowSchema>): OptionContract => {
 };
 
 export class PolygonClient {
-  private client: AxiosInstance;
-  private apiKey: string;
-  private baseUrl = "https://api.polygon.io";
+  private readonly http: HttpClient;
+  private readonly apiKey: string;
+  private readonly userAgent = DEFAULT_USER_AGENT;
+  private readonly baseUrl: string;
 
   private buildHeaders(): Record<string, string> {
     return {
-      Authorization: `Bearer ${this.apiKey}`.trim(),
+      ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}`.trim() } : {}),
+      "User-Agent": this.userAgent,
     };
   }
 
@@ -116,19 +131,22 @@ export class PolygonClient {
   }
 
   constructor() {
-    this.apiKey = process.env.POLYGON_API_KEY || "";
+    this.baseUrl = process.env.MASSIVE_BASE_URL || MASSIVE_BASE_URL;
+    this.apiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY || "";
 
     if (!this.apiKey) {
-      throw new Error("POLYGON_API_KEY is required");
+      throw new Error("MASSIVE_API_KEY or POLYGON_API_KEY is required");
     }
 
-    this.client = axios.create({
-      baseURL: this.baseUrl,
-      params: {
-        apiKey: this.apiKey,
-      },
-      timeout: 10000,
+    this.http = new HttpClient(this.baseUrl, {
+      params: { apiKey: this.apiKey },
+      headers: this.buildHeaders(),
     });
+
+    logger.info(
+      { baseUrl: this.baseUrl, usingMassiveKey: Boolean(process.env.MASSIVE_API_KEY) },
+      "PolygonClient configured"
+    );
   }
 
   async getAggregates(
@@ -140,7 +158,7 @@ export class PolygonClient {
     limit = 50000
   ): Promise<Bar[]> {
     try {
-      const response = await this.client.get(
+      const response = await this.http.get(
         `/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${from}/${to}`,
         { params: { adjusted: true, sort: "asc", limit } }
       );
@@ -159,7 +177,7 @@ export class PolygonClient {
 
   async getSnapshot(symbol: string): Promise<unknown> {
     try {
-      const response = await this.client.get(
+      const response = await this.http.get(
         `/v2/snapshot/locale/us/markets/stocks/tickers/${symbol}`
       );
       incPolygonRest(true, response.status);
@@ -189,7 +207,7 @@ export class PolygonClient {
       if (contractType) params.contract_type = contractType;
       if (strikePrice !== undefined) params.strike_price = strikePrice;
 
-      const response = await this.client.get("/v3/reference/options/contracts", { params });
+      const response = await this.http.get("/v3/reference/options/contracts", { params });
       const parsed = chainResponseSchema.parse(response.data);
       return parsed.results.map(mapChainRow);
     } catch (error: unknown) {
@@ -233,7 +251,7 @@ export class PolygonClient {
 
   async getOptionsSnapshot(underlyingSymbol: string, optionSymbol: string): Promise<unknown> {
     try {
-      const response = await this.client.get(
+      const response = await this.http.get(
         `/v3/snapshot/options/${underlyingSymbol}/${optionSymbol}`
       );
       incPolygonRest(true, response.status);
@@ -249,7 +267,7 @@ export class PolygonClient {
 
   async getPreviousClose(symbol: string): Promise<Bar | null> {
     try {
-      const response = await this.client.get(`/v2/aggs/ticker/${symbol}/prev`);
+      const response = await this.http.get(`/v2/aggs/ticker/${symbol}/prev`);
       incPolygonRest(true, response.status);
       const data = aggregatesResponseSchema.parse(response.data);
       const bar = data.results?.[0];
@@ -264,7 +282,7 @@ export class PolygonClient {
 
   async getMarketStatus(): Promise<unknown> {
     try {
-      const response = await this.client.get("/v1/marketstatus/now");
+      const response = await this.http.get("/v1/marketstatus/now");
       incPolygonRest(true, response.status);
       return marketStatusSchema.parse(response.data);
     } catch (error: unknown) {
@@ -275,3 +293,5 @@ export class PolygonClient {
     }
   }
 }
+
+export const massiveClient = new PolygonClient();

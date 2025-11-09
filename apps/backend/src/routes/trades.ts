@@ -1,5 +1,6 @@
 import type { Express, Request } from "express";
 import { Router } from "express";
+import { writeLimiter } from "../middleware/rateLimit";
 import { z } from "zod";
 import {
   TradeCreate,
@@ -43,6 +44,7 @@ export function setupTradesRoutes(app: Express): void {
 
   router.post(
     "/",
+    writeLimiter,
     asyncHandler(async (req, res) => {
       const owner = resolveOwner(req);
       if (!owner) {
@@ -79,6 +81,7 @@ export function setupTradesRoutes(app: Express): void {
 
   router.patch(
     "/:id",
+    writeLimiter,
     asyncHandler(async (req, res) => {
       const owner = resolveOwner(req);
       if (!owner) {
@@ -102,6 +105,7 @@ export function setupTradesRoutes(app: Express): void {
 
   router.delete(
     "/:id",
+    writeLimiter,
     asyncHandler(async (req, res) => {
       const owner = resolveOwner(req);
       if (!owner) {

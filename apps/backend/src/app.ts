@@ -5,11 +5,13 @@ import cors from "cors";
 import helmet from "helmet";
 import { healthRouter } from "./routes/health";
 import { setupRoutes } from "./routes";
-import { incHttp } from "./utils/metrics";
+import { incHttp, register } from "./utils/metrics";
 import { logger } from "./utils/logger";
 import { SupabaseService } from "./services/supabaseService";
+import { SupabaseSetupsService } from "./services/supabaseSetups";
 import { StrategyDetectorService } from "./services/strategyDetector";
 import { PolygonStreamingService } from "./services/polygonStreamingService";
+import { MassiveStreamingService } from "./services/massiveStreamingService";
 import { AlertRegistry } from "./alerts/registry";
 import { defaultStrategyParams } from "./config/strategy.defaults";
 import { errorHandler } from "./middleware/error";
@@ -95,6 +97,7 @@ function attachCorsHeaders(
 
 export interface AppServices {
   supabaseService: SupabaseService;
+  supabaseSetups: SupabaseSetupsService;
   strategyDetector: StrategyDetectorService;
   polygonService: PolygonStreamingService;
   alertRegistry: AlertRegistry;
@@ -109,6 +112,9 @@ export interface CreateAppResult {
   services: AppServices;
 }
 
+let massiveStream: MassiveStreamingService | undefined;
+let massiveStreamStarted = false;
+
 export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   const allowedOrigins = computeAllowedOrigins();
 
@@ -117,10 +123,12 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   const polygonService =
     options.services?.polygonService ?? new PolygonStreamingService(strategyDetector);
   const supabaseService = options.services?.supabaseService ?? new SupabaseService();
+  const supabaseSetups = options.services?.supabaseSetups ?? new SupabaseSetupsService();
   const alertRegistry = options.services?.alertRegistry ?? new AlertRegistry();
 
   const services: AppServices = {
     supabaseService,
+    supabaseSetups,
     strategyDetector,
     polygonService,
     alertRegistry,
@@ -166,10 +174,12 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
     next();
   });
 
-  app.use((req, _res, next) => {
+  app.use((req, res, next) => {
     const method = req.method ?? "GET";
     const routePath = getRoutePath(req);
-    incHttp(method, routePath);
+    res.on("finish", () => {
+      incHttp(method, routePath, res.statusCode);
+    });
     next();
   });
 
@@ -178,12 +188,52 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   });
 
   app.use(healthRouter);
+  app.get("/api/metrics", async (req, res) => {
+    const configured = (process.env.ADMIN_KEY || "").trim();
+    if (!configured) {
+      res.status(503).json({ error: "Metrics disabled (missing ADMIN_KEY)" });
+      return;
+    }
+
+    const headerKey = req.header("x-admin-key")?.trim();
+    if (!headerKey || headerKey !== configured) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    res.set("Content-Type", register.contentType);
+    res.send(await register.metrics());
+  });
+
   app.use("/api", healthRouter);
+
   app.use("/api/alerts", alertLimiter);
   app.use("/api/share", shareLimiter);
   setupRoutes(app, services);
 
   app.use(errorHandler);
+
+  const enableMassiveStream = process.env.FEATURE_ENABLE_MASSIVE_STREAM === "true";
+  if (enableMassiveStream && !massiveStreamStarted) {
+    const apiKey = process.env.MASSIVE_API_KEY;
+    if (!apiKey) {
+      logger.warn("FEATURE_ENABLE_MASSIVE_STREAM is enabled but MASSIVE_API_KEY is missing");
+    } else {
+      massiveStream = new MassiveStreamingService({
+        baseUrl: process.env.MASSIVE_WS_BASE || "wss://socket.massive.com",
+        cluster: process.env.MASSIVE_WS_CLUSTER || "options",
+        apiKey,
+        subscriptions: [],
+        logger: (event, meta) => logger.debug({ event, ...meta }, "massive_ws"),
+      });
+
+      massiveStream.on("message", (msg) => logger.debug({ msg }, "massive_ws_message"));
+      massiveStream.on("error", (error) => logger.error({ error }, "massive_ws_error"));
+      massiveStream.start();
+      massiveStreamStarted = true;
+    }
+  }
+
 
   return { app, services };
 }

@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles/globals.css";
+import "./styles/tokens.css";
 import { getMode, isDev, getBackendUrl, getBackendWsUrl } from "./utils/env";
 import { getBackendConnectionDeps } from "./hooks/backendConnectionDeps";
 import { backendConnectionDefaults } from "./hooks/backendConnectionDefaults";

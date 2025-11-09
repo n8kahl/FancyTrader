@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "steps": [
+    { "id": "selectSymbol", "label": "Select Symbol", "actions": ["enter"] },
+    { "id": "setEntry", "label": "Set Entry", "actions": ["enter"] },
+    {
+      "id": "setStopsTargets",
+      "label": "Stops & Targets",
+      "actions": ["setStop", "targetHit", "trim50"]
+    },
+    {
+      "id": "reviewConfirm",
+      "label": "Review & Confirm",
+      "actions": ["enter", "custom", "exitAll"]
+    }
+  ],
+  "flags": { "trim25": false, "trim50": true, "add": true, "exitAll": true }
+}

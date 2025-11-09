@@ -51,8 +51,14 @@
 | `ALERT_COOLDOWN_MS`    | Minimum time between alert firings per rule.
 | `PORT`                 | Backend HTTP/WS port (default 8080, sample `.env` uses 3001).
 | `DISCORD_WEBHOOK_URL`  | Optional webhook to share trades/backtests.
+| `ADMIN_KEY`           | Required for `/api/metrics` (header `x-admin-key`).
+| `ALLOWED_WS_ORIGINS`  | Comma-separated websocket allowlist (defaults to allow all when blank).
 
 Frontend-specific env (e.g., `VITE_BACKEND_URL`) live in `apps/frontend/src/utils/env.ts` and can be sourced from `.env`/`.env.local` per Vite conventions. See `.env.example` for defaults and `.env.test` for the deterministic values used by Jest/Vitest.
+
+## Market session states
+
+`/api/market/status` now normalizes the Massive market-status feed into four canonical sessions: **premarket**, **regular**, **aftermarket**, and **closed**. Each payload includes `nextOpen`, `nextClose`, the upstream `raw` body, and `source: "massive"`. The frontend polls this endpoint every 15 seconds and shows a header chip with contextual hints (e.g., premarket uses extended-hours data, closed falls back to cached snapshots). When mock mode is enabled, the indicator displays "Session: Mock" without hitting the backend.
 
 ## Polygon / Massive notes
 
@@ -118,3 +124,12 @@ docker compose up --build
 - `docs/backtesting.md` – deep dive into the backtest subsystem.
 
 Happy trading! 🎯
+## Supabase setups & scan jobs
+
+- **Schema:** `migrations/003_setups.sql` provisions the per-user `setups` table (RLS enforced via `auth.uid() = owner`) and `migrations/004_scan_jobs.sql` adds the idempotent `scan_jobs` log keyed by (`job_name`, `window_start`).
+- **Backend service:** `apps/backend/src/services/supabaseSetups.ts` exposes `listSetups`, `saveSetup`, and `deleteSetup` so routes (and future workers) can persist setups without the legacy KV table. `GET /api/setups/history/:userId` now pulls from this table and `DELETE /api/setups/:setupId` accepts `x-user-id`/`userId` to scope deletions.
+- **Worker:** `apps/worker` reuses the Massive REST client, polls `/v1/marketstatus/now`, and scans `WORKER_SYMBOLS` every loop. Results are recorded in `scan_jobs` with `onConflict: job_name,window_start`, so retries simply bump the row instead of duplicating work.
+- **Running:**
+  - Local dev: `pnpm --filter @fancytrader/worker dev` (or `build && start`).
+  - Railway/cron: run `node dist/index.js` on your desired schedule (e.g., every 1 min during pre/regular/after sessions, every 5–10 min when closed).
+- **Configuration:** Worker instances share the backend’s `MASSIVE_API_KEY`, optional `MASSIVE_BASE_URL`, and Supabase credentials plus `WORKER_SYMBOLS` to define the watchlist (default `AAPL,MSFT`).

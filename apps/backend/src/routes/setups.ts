@@ -1,9 +1,9 @@
 import type { Request } from "express";
 import { Express } from "express";
-import type { SupabaseService } from "../services/supabaseService";
+import type { SupabaseSetupsService } from "../services/supabaseSetups";
 import type { StrategyDetectorService } from "../services/strategyDetector";
-import type { PolygonStreamingService } from "../services/polygonStreamingService";
 import { asyncHandler } from "../utils/asyncHandler";
+import { writeLimiter } from "../middleware/rateLimit";
 import { strategyParamsSchema, type StrategyParams } from "@fancytrader/shared/cjs";
 import { defaultStrategyParams } from "../config/strategy.defaults";
 import { badRequest } from "../utils/httpError";
@@ -14,10 +14,23 @@ import {
 } from "../validation/schemas";
 
 interface Services {
-  supabaseService: SupabaseService;
+  supabaseSetups: SupabaseSetupsService;
   strategyDetector: StrategyDetectorService;
-  polygonService: PolygonStreamingService;
 }
+
+const resolveUserId = (req: Request): string | undefined => {
+  const headerUserId = req.header("x-user-id");
+  if (typeof headerUserId === "string" && headerUserId.trim().length > 0) {
+    return headerUserId.trim();
+  }
+
+  const queryValue = req.query.userId;
+  if (typeof queryValue === "string" && queryValue.trim().length > 0) {
+    return queryValue.trim();
+  }
+
+  return undefined;
+};
 
 function extractStrategyParams(req: Request): StrategyParams | undefined {
   if (req.body?.strategyParams) {
@@ -36,12 +49,17 @@ function extractStrategyParams(req: Request): StrategyParams | undefined {
   return undefined;
 }
 
-export function setupSetupsRoutes(app: Express, services: Services): void {
-  const { supabaseService, strategyDetector } = services;
+const clampLimit = (value: unknown, fallback = 100): number => {
+  const parsed = typeof value === "string" ? Number(value) : Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.min(Math.max(Math.floor(parsed), 1), 500);
+};
 
-  /**
-   * GET /api/setups - Get all active setups
-   */
+export function setupSetupsRoutes(app: Express, services: Services): void {
+  const { supabaseSetups, strategyDetector } = services;
+
   app.get(
     "/api/setups",
     asyncHandler(async (req, res) => {
@@ -52,9 +70,6 @@ export function setupSetupsRoutes(app: Express, services: Services): void {
     })
   );
 
-  /**
-   * GET /api/setups/:symbol - Get setups for a specific symbol
-   */
   app.get(
     "/api/setups/:symbol",
     asyncHandler(async (req, res) => {
@@ -67,26 +82,23 @@ export function setupSetupsRoutes(app: Express, services: Services): void {
     })
   );
 
-  /**
-   * GET /api/setups/history/:userId - Get setup history from database
-   */
   app.get(
     "/api/setups/history/:userId",
     asyncHandler(async (req, res) => {
       const { userId } = userIdParamSchema.parse(req.params);
-      const setups = await supabaseService.getSetups();
+      const limit = clampLimit(req.query.limit, 100);
+      const setups = await supabaseSetups.listSetups(userId, limit);
       res.json({ userId, setups, count: setups.length });
     })
   );
 
-  /**
-   * DELETE /api/setups/:setupId - Delete a setup
-   */
   app.delete(
     "/api/setups/:setupId",
+    writeLimiter,
     asyncHandler(async (req, res) => {
       const { setupId } = setupIdParamSchema.parse(req.params);
-      await supabaseService.deleteSetup(setupId);
+      const owner = resolveUserId(req);
+      await supabaseSetups.deleteSetup(setupId, owner);
       res.json({ success: true, setupId });
     })
   );

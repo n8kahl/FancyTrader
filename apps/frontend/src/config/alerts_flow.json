@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "id": "quick",
+      "label": "Quick Alerts",
+      "actions": ["trim25", "trim50", "add", "targetHit", "stopLoss", "exitAll"]
+    },
+    { "id": "compose", "label": "Compose", "actions": ["custom"] }
+  ],
+  "flags": {
+    "trim25": true,
+    "trim50": true,
+    "add": true,
+    "exitAll": true,
+    "targetHit": true,
+    "stopLoss": true
+  }
+}

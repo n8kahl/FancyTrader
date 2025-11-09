@@ -6,6 +6,56 @@ import { badRequest, internalError } from "../utils/httpError";
 
 const polygonClient = new PolygonClient();
 
+type NormalizedSession = "premarket" | "regular" | "aftermarket" | "closed";
+
+const SESSION_HINTS: Record<NormalizedSession, (val?: string) => boolean> = {
+  premarket: (val) => Boolean(val?.includes("pre")),
+  regular: (val) => Boolean(val?.includes("open")),
+  aftermarket: (val) => Boolean(val?.includes("after") || val?.includes("post")),
+  closed: () => false,
+};
+
+export function normalizeMarketSession(rawResponse: unknown) {
+  const raw =
+    typeof rawResponse === "object" && rawResponse !== null
+      ? (rawResponse as Record<string, unknown>)
+      : {};
+  const marketText = String(
+    raw.market ??
+      raw.market_state ??
+      raw.session ??
+      (typeof raw.is_open === "boolean" ? (raw.is_open ? "open" : "closed") : "")
+  ).toLowerCase();
+
+  let session: NormalizedSession = "closed";
+  if (SESSION_HINTS.premarket(marketText)) {
+    session = "premarket";
+  } else if (SESSION_HINTS.aftermarket(marketText)) {
+    session = "aftermarket";
+  } else if (SESSION_HINTS.regular(marketText)) {
+    session = "regular";
+  }
+
+  const pickTimestamp = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = raw[key];
+      if (typeof value === "string" && value.length > 0) {
+        return value;
+      }
+    }
+    return null;
+  };
+
+  return {
+    session,
+    nextOpen: pickTimestamp("next_open", "next_opening"),
+    nextClose: pickTimestamp("next_close", "next_closing"),
+    source: "massive" as const,
+    raw,
+  };
+}
+
+
 export function setupMarketDataRoutes(app: Express): void {
   /**
    * GET /api/market/snapshot/:symbol - Get current market snapshot
@@ -95,7 +145,7 @@ export function setupMarketDataRoutes(app: Express): void {
     "/api/market/status",
     asyncHandler(async (_req, res) => {
       const status = await polygonClient.getMarketStatus();
-      res.json(status);
+      res.json(normalizeMarketSession(status));
     })
   );
 }
