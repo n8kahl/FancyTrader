@@ -16,11 +16,21 @@ const jobsInflight = new promClient.Gauge({
   name: "jobs_inflight",
   help: "Number of scan jobs currently executing",
 });
+const scanRuns = new promClient.Counter({
+  name: "scan_runs_total",
+  help: "Scan runs by session/noop/result",
+  labelNames: ["session", "noop", "result"],
+});
 const scanLatencyMs = new promClient.Histogram({
   name: "scan_latency_ms",
   help: "Latency of scan runs in milliseconds",
   buckets: [50, 100, 250, 500, 1000, 2000, 5000, 10000],
+  labelNames: ["session", "noop", "result"],
 });
+
+function labels({ session = "unknown", noop = false, result = "success" } = {}) {
+  return { session, noop: String(noop), result };
+}
 
 const log = (...a) => console.log(...a);
 
@@ -41,6 +51,32 @@ function json(res, code, obj) {
   res.end(body);
 }
 
+const run = async (ctx = {}) => {
+  const m = await workerModPromise;
+  if (!m?.main) {
+    console.error("[metrics] run skipped -- worker module not ready");
+    return;
+  }
+  const l = labels({ session: ctx.session, noop: ctx.noop, result: "success" });
+  const endTimer = scanLatencyMs.startTimer(l);
+  jobsInflight.inc();
+  let resultLabel = "success";
+  try {
+    await m.main(ctx);
+    scanSuccess.inc();
+    scanRuns.labels({ ...l, result: resultLabel }).inc();
+    log("[diag] main() returned");
+  } catch (e) {
+    resultLabel = "failure";
+    scanFailure.inc();
+    scanRuns.labels({ ...l, result: resultLabel }).inc();
+    console.error("[metrics] run failed", e);
+  } finally {
+    endTimer({ result: resultLabel });
+    jobsInflight.dec();
+  }
+};
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
@@ -60,9 +96,7 @@ const server = http.createServer(async (req, res) => {
         console.error("[run-now] worker module not ready");
         return;
       }
-      Promise.resolve(m.main({ forceSession: session || undefined }))
-        .then(() => log("[run-now] main() returned"))
-        .catch((e) => console.error("[run-now] main() failed", e));
+      void run({ session, forceSession: session || undefined });
       return;
     }
 
@@ -87,21 +121,6 @@ const server = http.createServer(async (req, res) => {
 (async () => {
   const m = await workerModPromise;
   if (m?.main) {
-    const run = async () => {
-      const endTimer = scanLatencyMs.startTimer();
-      jobsInflight.inc();
-      try {
-        await m.main();
-        scanSuccess.inc();
-        log("[diag] main() returned");
-      } catch (e) {
-        scanFailure.inc();
-        console.error("[metrics] run failed", e);
-      } finally {
-        endTimer();
-        jobsInflight.dec();
-      }
-    };
     run();
     setInterval(run, EVERY);
   } else {
