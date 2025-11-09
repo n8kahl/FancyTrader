@@ -2,6 +2,8 @@ import http from "node:http";
 import { URL } from "node:url";
 import * as promClient from "prom-client";
 
+promClient.collectDefaultMetrics();
+
 const log = (...a) => console.log(...a);
 
 const workerModPromise = import("./dist/index.js").catch((e) => {
