@@ -1,5 +1,6 @@
 import http from "node:http";
 import { URL } from "node:url";
+import * as promClient from "prom-client";
 
 const log = (...a) => console.log(...a);
 
@@ -46,14 +47,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && url.pathname === "/metrics") {
-      const m = await workerModPromise;
-      if (m?.metrics?.expose) {
-        const text = await m.metrics.expose();
-        res.writeHead(200, { "content-type": "text/plain" });
-        res.end(text);
-      } else {
-        res.writeHead(404, { "content-type": "text/plain" });
-        res.end("# no metrics");
+      try {
+        res.setHeader("Content-Type", promClient.register.contentType);
+        res.end(await promClient.register.metrics());
+      } catch (e) {
+        res.writeHead(500, { "content-type": "text/plain" });
+        res.end(`# metrics error\n${e?.message || e}`);
       }
       return;
     }
