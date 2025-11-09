@@ -3,32 +3,13 @@ import { pathToFileURL } from "node:url";
 import { MassiveClient, marketToMode } from "@fancytrader/shared";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
-  logFetchError,
-  optionQuote,
-  optionsSnapshotForContract,
-  optionsSnapshotForUnderlying,
-  universalSnapshot,
+  indexAggsDaily,
+  isIndex,
+  isOccOption,
+  optionContractSnapshot,
+  snapshotIndices,
+  underlyingFromOcc,
 } from "./clients/massive.js";
-
-const OPTION_OCC_RE = /^(?:O:)?([A-Z]+)\d{6}[CP]\d{8}$/i;
-
-type SymbolKind = "index" | "option" | "underlying";
-
-function classifySymbol(symbol: string): SymbolKind {
-  if (symbol.startsWith("I:")) return "index";
-  if (OPTION_OCC_RE.test(symbol)) return "option";
-  return "underlying";
-}
-
-function getUnderlyingFromOptionSymbol(optionSymbol: string): string {
-  const raw = optionSymbol.toUpperCase().replace(/^O:/, "");
-  const match = raw.match(OPTION_OCC_RE);
-  return match ? match[1] : "";
-}
-
-function ensureOptionTicker(symbol: string): string {
-  return symbol.startsWith("O:") ? symbol : `O:${symbol}`;
-}
 
 type ScanMode = "premarket" | "regular" | "aftermarket" | "closed";
 type ScanStatus = "pending" | "running" | "success" | "failed";
@@ -108,33 +89,16 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
 
   try {
     if (mode === "closed") {
-      const kind = classifySymbol(symbol);
-      if (kind === "index") {
-        try {
-          await universalSnapshot([symbol]);
-        } catch (err: unknown) {
-          logFetchError(jobName, err);
-        }
-      } else if (kind === "option") {
-        const underlying = getUnderlyingFromOptionSymbol(symbol);
-        if (!underlying) throw new Error("Invalid option symbol");
-        const optionTicker = ensureOptionTicker(symbol);
-        try {
-          await optionsSnapshotForContract(underlying, optionTicker);
-        } catch (err: unknown) {
-          logFetchError(jobName, err);
-        }
-        try {
-          await optionQuote(optionTicker);
-        } catch (err: unknown) {
-          logFetchError(jobName, err);
-        }
+      if (isIndex(symbol)) {
+        await snapshotIndices([symbol]);
+        const today = new Date().toISOString().slice(0, 10);
+        await indexAggsDaily(symbol, today, today);
+      } else if (isOccOption(symbol)) {
+        const underlying = underlyingFromOcc(symbol);
+        if (!underlying) throw new Error("Invalid option ticker");
+        await optionContractSnapshot(underlying, symbol);
       } else {
-        try {
-          await optionsSnapshotForUnderlying(symbol);
-        } catch (err: unknown) {
-          logFetchError(jobName, err);
-        }
+        throw new Error(`Unsupported ticker format: ${symbol}`);
       }
     } else {
       const aggs = await massiveClient.getMinuteAggs(symbol, 30);

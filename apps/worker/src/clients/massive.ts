@@ -1,52 +1,57 @@
-const MASSIVE_BASE_URL = "https://api.massive.com";
-const API_KEY = process.env.MASSIVE_API_KEY || "";
+import axios, { AxiosError } from "axios";
 
-if (!API_KEY) {
-  console.error("MASSIVE_API_KEY is missing");
-}
+const BASE_URL = "https://api.massive.com/v3";
+const API_KEY = process.env.MASSIVE_API_KEY!;
+if (!API_KEY) throw new Error("Missing MASSIVE_API_KEY env var");
 
-function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>) {
-  const url = new URL(path, MASSIVE_BASE_URL);
-  const entries = Object.entries(params || {}).filter(([_, v]) => v !== undefined && v !== null);
-  for (const [k, v] of entries) url.searchParams.set(k, String(v));
-  url.searchParams.set("apiKey", API_KEY);
-  return url;
-}
+const http = axios.create({
+  baseURL: BASE_URL,
+  params: { apiKey: API_KEY },
+  timeout: 15000,
+});
 
-async function getJson<T = any>(path: string, params?: Record<string, any>): Promise<T> {
-  const url = buildUrl(path, params);
-  const res = await fetch(url, { method: "GET" });
-  if (!res.ok) {
-    let body: string | undefined;
-    try {
-      body = await res.text();
-    } catch {}
-    console.error(`[massive] GET ${path} failed`, { status: res.status, body });
-    throw new Error(`Massive request failed: ${res.status}`);
+async function get<T = unknown>(path: string, params?: Record<string, any>, tries = 3, delayMs = 500): Promise<T> {
+  try {
+    const { data } = await http.get<T>(path, { params });
+    return data;
+  } catch (e) {
+    const err = e as AxiosError<any>;
+    const status = err.response?.status;
+    const q = new URLSearchParams({ ...(params ?? {}), apiKey: "<redacted>" }).toString();
+    const full = `${BASE_URL}${path}?${q}`;
+    if (status && (status === 403 || status === 404)) {
+      console.error(`[HTTP ${status}] ${full}`);
+      throw err;
+    }
+    if (tries > 1) {
+      await new Promise((r) => setTimeout(r, delayMs));
+      return get<T>(path, params, tries - 1, Math.min(delayMs * 2, 4000));
+    }
+    console.error(`[HTTP ${status ?? "ERR"}] ${full}`, err.message);
+    throw err;
   }
-  return res.json() as Promise<T>;
 }
 
-export async function universalSnapshot(tickers: string[]) {
-  return getJson("/v3/snapshot", { "ticker.any_of": tickers.join(",") });
+export async function snapshotIndices(tickers: string[]) {
+  return get("/snapshot/indices", { "ticker.any_of": tickers.join(",") });
 }
 
-export async function optionsSnapshotForUnderlying(underlying: string) {
-  return getJson(`/v3/snapshot/options/${encodeURIComponent(underlying)}`);
+export async function optionChainSnapshot(underlying: string) {
+  const u = encodeURIComponent(underlying);
+  return get(`/snapshot/options/${u}`);
 }
 
-export async function optionsSnapshotForContract(underlying: string, contract: string) {
-  const clean = contract.startsWith("O:") ? contract.slice(2) : contract;
-  return getJson(`/v3/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(clean)}`);
+export async function optionContractSnapshot(underlying: string, contract: string) {
+  const u = encodeURIComponent(underlying);
+  const c = encodeURIComponent(contract);
+  return get(`/snapshot/options/${u}/${c}`);
 }
 
-export async function optionQuote(optionsTicker: string) {
-  return getJson(`/v3/quotes/${encodeURIComponent(optionsTicker)}`);
+export async function indexAggsDaily(ticker: string, fromISO: string, toISO: string) {
+  const t = encodeURIComponent(ticker);
+  return get(`/aggs/ticker/${t}/range/1/day/${fromISO}/${toISO}`, { market: "indices" });
 }
 
-export function logFetchError(context: string, err: any) {
-  const status = err?.status || err?.response?.status;
-  const data = err?.response?.data;
-  console.error(`[massive] ${context} failed`, { status, data, err });
-  throw err;
-}
+export const isIndex = (s: string) => s.startsWith("I:");
+export const isOccOption = (s: string) => /^[A-Z]{1,6}\d{6}[CP]\d{8}$/.test(s);
+export const underlyingFromOcc = (s: string) => s.match(/^([A-Z]{1,6})\d{6}[CP]\d{8}$/)?.[1] ?? "";

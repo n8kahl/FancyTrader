@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@fancytrader/shared": "workspace:*",
-    "@supabase/supabase-js": "^2.49.8"
+    "@supabase/supabase-js": "^2.49.8",
+    "axios": "^1.7.2"
   },
   "devDependencies": {
     "ts-node": "^10.9.2",
