@@ -7,7 +7,7 @@
     "pnpm": ">=9 <10"
   },
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "echo \"noop (root)\"",
     "dev": "pnpm -r --parallel dev",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
@@ -21,7 +21,8 @@
     "sync:figma-flow:watchlist": "ts-node tools/figma-flow-sync.ts --flow=watchlist",
     "sync:figma-flow:alerts": "ts-node tools/figma-flow-sync.ts --flow=alerts",
     "sync:figma-flow:onboarding": "ts-node tools/figma-flow-sync.ts --flow=onboarding",
-    "sync:figma-flow:strategies": "ts-node tools/figma-flow-sync.ts --flow=strategies"
+    "sync:figma-flow:strategies": "ts-node tools/figma-flow-sync.ts --flow=strategies",
+    "build:all": "pnpm -r --parallel build"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
