@@ -26,11 +26,18 @@ export async function getIndexSnapshots(indices: string[]): Promise<Record<strin
   return out;
 }
 
-export function summarizeIndexForLog(s: IndexSnapshot) {
+export function summarizeIndexForLog(raw: any) {
   const last =
-    (s as any)?.last ?? (s as any)?.close ?? (s as any)?.price ?? (s as any)?.p;
+    raw?.lastTrade?.price ??
+    raw?.lastTrade?.p ??
+    raw?.last?.price ??
+    raw?.last ??
+    raw?.close;
   const prevClose =
-    (s as any)?.prevClose ?? (s as any)?.previous_close ?? (s as any)?.pc;
+    raw?.previousClose?.price ??
+    raw?.previousClose?.p ??
+    raw?.prevClose ??
+    raw?.prev?.close;
   return { last, prevClose };
 }
 
