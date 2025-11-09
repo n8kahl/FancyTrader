@@ -3,13 +3,18 @@ import { pathToFileURL } from "node:url";
 import { MassiveClient, marketToMode } from "@fancytrader/shared";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
-  indexAggsDaily,
-  isIndex,
-  isOccOption,
+  indexPrevBar,
+  isExpiredOcc,
   optionContractSnapshot,
+  optionQuote,
   snapshotIndices,
   underlyingFromOcc,
 } from "./clients/massive.js";
+
+const OCC_RE = /^[A-Z]{1,6}\d{6}[CP]\d{8}$/;
+
+const isIndexTicker = (symbol: string): boolean => symbol.startsWith("I:");
+const isOccTicker = (symbol: string): boolean => OCC_RE.test(symbol);
 
 type ScanMode = "premarket" | "regular" | "aftermarket" | "closed";
 type ScanStatus = "pending" | "running" | "success" | "failed";
@@ -89,14 +94,22 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
 
   try {
     if (mode === "closed") {
-      if (isIndex(symbol)) {
+      if (isIndexTicker(symbol)) {
         await snapshotIndices([symbol]);
-        const today = new Date().toISOString().slice(0, 10);
-        await indexAggsDaily(symbol, today, today);
-      } else if (isOccOption(symbol)) {
-        const underlying = underlyingFromOcc(symbol);
-        if (!underlying) throw new Error("Invalid option ticker");
-        await optionContractSnapshot(underlying, symbol);
+        await indexPrevBar(symbol);
+      } else if (isOccTicker(symbol)) {
+        if (isExpiredOcc(symbol)) {
+          console.warn(`Skipping expired options contract: ${symbol}`);
+        } else {
+          const underlying = underlyingFromOcc(symbol);
+          if (!underlying) throw new Error("Invalid option ticker");
+          try {
+            await optionContractSnapshot(underlying, symbol);
+          } catch (err) {
+            console.warn(`snapshot failed for ${symbol}`, err instanceof Error ? err.message : err);
+            await optionQuote(symbol);
+          }
+        }
       } else {
         throw new Error(`Unsupported ticker format: ${symbol}`);
       }
