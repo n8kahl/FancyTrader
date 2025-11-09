@@ -66,6 +66,18 @@ export async function indexAggsDaily(ticker: string, fromISO: string, toISO: str
   }
 }
 
+export async function optionChainSnapshot(underlying: string) {
+  try {
+    const { data } = await httpV3.get(
+      `/snapshot/options/${encodeURIComponent(underlying)}`
+    );
+    return data;
+  } catch (e) {
+    logHttpError(e);
+    throw e;
+  }
+}
+
 export async function optionContractSnapshot(underlying: string, contract: string) {
   try {
     const { data } = await httpV3.get(

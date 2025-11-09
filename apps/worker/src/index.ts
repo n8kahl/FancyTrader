@@ -5,6 +5,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   indexPrevBar,
   isExpiredOcc,
+  optionChainSnapshot,
   optionContractSnapshot,
   optionQuote,
   snapshotIndices,
@@ -16,11 +17,7 @@ import {
   summarizeIndexForLog,
 } from "./jobs/indexSnapshot.js";
 import { smokeOption } from "./jobs/smokeOption.js";
-
-const OCC_RE = /^[A-Z]{1,6}\d{6}[CP]\d{8}$/;
-
-const isIndexTicker = (symbol: string): boolean => symbol.startsWith("I:");
-const isOccTicker = (symbol: string): boolean => OCC_RE.test(symbol);
+import { classify } from "./lib/tickers.js";
 
 type ScanMode = "premarket" | "regular" | "aftermarket" | "closed";
 type ScanStatus = "pending" | "running" | "success" | "failed";
@@ -101,7 +98,8 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
 
   try {
     if (mode === "closed") {
-      if (isIndexTicker(symbol)) {
+      const kind = classify(symbol);
+      if (kind === "index") {
         const cached = INDICES_CACHE[symbol];
         if (cached) {
           log("[worker] index cache hit", symbol, summarizeIndexForLog(cached));
@@ -109,7 +107,7 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
           await snapshotIndices([symbol]);
         }
         await indexPrevBar(symbol);
-      } else if (isOccTicker(symbol)) {
+      } else if (kind === "option_contract") {
         if (isExpiredOcc(symbol)) {
           console.warn(`Skipping expired options contract: ${symbol}`);
         } else {
@@ -122,6 +120,8 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
             await optionQuote(symbol);
           }
         }
+      } else if (kind === "option_underlying") {
+        await optionChainSnapshot(symbol);
       } else {
         throw new Error(`Unsupported ticker format: ${symbol}`);
       }
