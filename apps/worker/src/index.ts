@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { MassiveClient, marketToMode } from "@fancytrader/shared";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
-  logAxiosError,
+  logFetchError,
   optionQuote,
   optionsSnapshotForContract,
   optionsSnapshotForUnderlying,
@@ -110,15 +110,31 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
     if (mode === "closed") {
       const kind = classifySymbol(symbol);
       if (kind === "index") {
-        await universalSnapshot([symbol]).catch((err: unknown) => logAxiosError(jobName, err));
+        try {
+          await universalSnapshot([symbol]);
+        } catch (err: unknown) {
+          logFetchError(jobName, err);
+        }
       } else if (kind === "option") {
         const underlying = getUnderlyingFromOptionSymbol(symbol);
         if (!underlying) throw new Error("Invalid option symbol");
         const optionTicker = ensureOptionTicker(symbol);
-        await optionsSnapshotForContract(underlying, optionTicker).catch((err: unknown) => logAxiosError(jobName, err));
-        await optionQuote(optionTicker).catch((err: unknown) => logAxiosError(jobName, err));
+        try {
+          await optionsSnapshotForContract(underlying, optionTicker);
+        } catch (err: unknown) {
+          logFetchError(jobName, err);
+        }
+        try {
+          await optionQuote(optionTicker);
+        } catch (err: unknown) {
+          logFetchError(jobName, err);
+        }
       } else {
-        await optionsSnapshotForUnderlying(symbol).catch((err: unknown) => logAxiosError(jobName, err));
+        try {
+          await optionsSnapshotForUnderlying(symbol);
+        } catch (err: unknown) {
+          logFetchError(jobName, err);
+        }
       }
     } else {
       const aggs = await massiveClient.getMinuteAggs(symbol, 30);
