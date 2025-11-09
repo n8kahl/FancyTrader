@@ -22,5 +22,6 @@ export type { AlertCondition, WSInbound, WSOutbound, ServiceState } from "./sche
 
 export * from "./client/contracts";
 export * from "./client/ws";
+export * from "./client/massive";
 
 export * from "./contracts/strategy";

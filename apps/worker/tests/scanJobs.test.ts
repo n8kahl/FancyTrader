@@ -1,14 +1,16 @@
+import type { MassiveClient } from "@fancytrader/shared/cjs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { upsertScanJob, __resetSupabaseClientForTests } from "../src/index";
+import {
+  __resetMassiveClientForTests,
+  __resetSupabaseClientForTests,
+  __setMassiveClientForTests,
+  upsertScanJob,
+} from "../src/index";
 
-vi.mock("../../backend/src/services/polygonClient", () => {
-  return {
-    massiveClient: {
-      getMarketStatus: vi.fn().mockResolvedValue({ market: "open" }),
-      getAggregates: vi.fn().mockResolvedValue([]),
-      getPreviousClose: vi.fn().mockResolvedValue(null),
-    },
-  };
+const createMassiveClientMock = () => ({
+  getMarketStatus: vi.fn().mockResolvedValue({ market: "open" }),
+  getMinuteAggs: vi.fn().mockResolvedValue([]),
+  getTickerSnapshot: vi.fn().mockResolvedValue({}),
 });
 
 const rows = new Map<string, Record<string, unknown>>();
@@ -35,6 +37,12 @@ beforeEach(() => {
   process.env.SUPABASE_URL = "http://localhost:54321";
   process.env.SUPABASE_SERVICE_KEY = "service-role";
   __resetSupabaseClientForTests();
+  const mock = createMassiveClientMock();
+  __setMassiveClientForTests(mock as unknown as MassiveClient);
+});
+
+afterEach(() => {
+  __resetMassiveClientForTests();
 });
 
 describe("scan job upserts", () => {

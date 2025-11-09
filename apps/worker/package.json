@@ -10,6 +10,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fancytrader/shared": "workspace:*",
     "@supabase/supabase-js": "^2.49.8"
   },
   "devDependencies": {

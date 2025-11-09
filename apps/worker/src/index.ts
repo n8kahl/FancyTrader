@@ -1,10 +1,14 @@
+import { MassiveClient, marketToMode } from "@fancytrader/shared/cjs";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { massiveClient } from "../../backend/src/services/polygonClient";
 
 type ScanMode = "premarket" | "regular" | "aftermarket" | "closed";
 type ScanStatus = "pending" | "running" | "success" | "failed";
 
 type ScanMeta = Record<string, unknown>;
+
+const log = (...args: any[]) => console.log("[worker]", ...args);
+
+let massiveClient: MassiveClient = new MassiveClient();
 
 const WATCH_SYMBOLS = (process.env.WORKER_SYMBOLS ?? "AAPL,MSFT")
   .split(",")
@@ -33,12 +37,6 @@ export const computeWindowStart = (date = new Date()): string => {
   const copy = new Date(date);
   copy.setSeconds(0, 0);
   return copy.toISOString();
-};
-
-const rangeForMinutes = (minutes: number) => {
-  const end = new Date();
-  const start = new Date(end.getTime() - minutes * 60 * 1000);
-  return { start: start.toISOString(), end: end.toISOString() };
 };
 
 export async function upsertScanJob(
@@ -81,18 +79,22 @@ async function scanSymbol(mode: ScanMode, symbol: string): Promise<void> {
 
   try {
     if (mode === "closed") {
-      await massiveClient.getPreviousClose(symbol);
+      const snap = await massiveClient.getTickerSnapshot(symbol);
+      // TODO: compute & store setups from 'snap'
     } else {
-      const { start, end } = rangeForMinutes(30);
-      await massiveClient.getAggregates(symbol, 1, "minute", start, end, 300);
+      const aggs = await massiveClient.getMinuteAggs(symbol, 30);
+      // TODO: compute & store setups from 'aggs'
     }
+
     await upsertScanJob(jobName, windowStart, "success", { mode, symbol });
-  } catch (error) {
+    log({ jobName, status: "success" });
+  } catch (error: any) {
     await upsertScanJob(jobName, windowStart, "failed", {
       mode,
       symbol,
       error: error instanceof Error ? error.message : String(error),
     });
+    console.error({ jobName, err: String(error?.message ?? error) });
   }
 }
 
@@ -103,18 +105,22 @@ export async function scanLoop(mode: ScanMode): Promise<void> {
 }
 
 export async function resolveCurrentMode(): Promise<ScanMode> {
-  const raw = (await massiveClient.getMarketStatus()) as Record<string, unknown>;
-  const market = String(raw?.market ?? "").toLowerCase();
-  if (market.includes("pre")) return "premarket";
-  if (market.includes("after")) return "aftermarket";
-  if (market.includes("open")) return "regular";
-  return "closed";
+  const raw = await massiveClient.getMarketStatus();
+  return marketToMode(raw);
 }
 
 export async function main(): Promise<void> {
   const mode = await resolveCurrentMode();
   await scanLoop(mode);
 }
+
+export const __setMassiveClientForTests = (client: MassiveClient): void => {
+  massiveClient = client;
+};
+
+export const __resetMassiveClientForTests = (): void => {
+  massiveClient = new MassiveClient();
+};
 
 export const __resetSupabaseClientForTests = (): void => {
   supabase = null;
