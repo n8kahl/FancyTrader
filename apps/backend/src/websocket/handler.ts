@@ -3,7 +3,7 @@ import type { IncomingMessage } from "http";
 import type { RawData, WebSocket } from "ws";
 import type { ServerOutbound } from "@fancytrader/shared";
 import { z } from "zod";
-import { WSMessage, DetectedSetup } from "../types/index.js";
+import { DetectedSetup } from "../types/index.js";
 import { MassiveStreamingService } from "../services/massiveStreamingService.js";
 import { StrategyDetectorService } from "../services/strategyDetector.js";
 import { logger } from "../utils/logger.js";
@@ -67,7 +67,7 @@ export function setupWebSocketHandler(
 
   streamingService.on("message", (payload: unknown) => {
     if (typeof payload === "object" && payload !== null && "type" in payload) {
-      broadcastToAll(wss, payload as WSMessage);
+      broadcastToAll(wss, payload as ServerOutbound);
       return;
     }
     broadcastToAll(wss, { type: "status", message: "Upstream activity" });
@@ -76,7 +76,11 @@ export function setupWebSocketHandler(
   streamingService.on("open", () => {
     broadcastToAll(wss, {
       type: "SERVICE_STATE",
-      payload: { status: "connected" },
+      payload: {
+        source: "polygon",
+        status: "healthy",
+        timestamp: Date.now(),
+      },
       timestamp: Date.now(),
     });
   });
@@ -84,7 +88,11 @@ export function setupWebSocketHandler(
   streamingService.on("close", () => {
     broadcastToAll(wss, {
       type: "SERVICE_STATE",
-      payload: { status: "disconnected" },
+      payload: {
+        source: "polygon",
+        status: "offline",
+        timestamp: Date.now(),
+      },
       timestamp: Date.now(),
     });
   });
@@ -184,10 +192,11 @@ export function setupWebSocketHandler(
     });
 
     sendMessage(ws, {
-      type: "SETUP_UPDATE",
+      type: "SERVICE_STATE",
       payload: {
-        status: "connected",
-        message: "Connected to Fancy Trader backend",
+        source: "polygon",
+        status: "healthy",
+        timestamp: Date.now(),
       },
       timestamp: Date.now(),
     });
@@ -196,7 +205,7 @@ export function setupWebSocketHandler(
     if (activeSetups.length > 0) {
       sendMessage(ws, {
         type: "SETUP_UPDATE",
-        payload: { setups: activeSetups },
+        payload: { setups: activeSetups.map((setup) => ({ ...setup })) },
         timestamp: Date.now(),
       });
     }
@@ -205,7 +214,7 @@ export function setupWebSocketHandler(
   strategyDetector.on("setup-detected", (setup: DetectedSetup) => {
     broadcastToAll(wss, {
       type: "SETUP_UPDATE",
-      payload: { action: "new", setup },
+      payload: { action: "new", setup: { ...setup } },
       timestamp: Date.now(),
     });
   });
@@ -293,7 +302,7 @@ function handleUnsubscribe(
   logger.info("Client unsubscribed", { count: symbols.length });
 }
 
-function sendMessage(ws: WebSocket, message: WSMessage): void {
+function sendMessage(ws: WebSocket, message: ServerOutbound): void {
   if (ws.readyState === ws.OPEN) {
     ws.send(JSON.stringify(message));
   }
@@ -309,7 +318,7 @@ function sendError(ws: WebSocket, error: string): void {
   sendServerOutbound(ws, { type: "error", message: error });
 }
 
-function broadcastToAll(wss: WebSocketServer, message: WSMessage): void {
+function broadcastToAll(wss: WebSocketServer, message: ServerOutbound): void {
   for (const client of wss.clients) {
     if (client.readyState === client.OPEN) {
       client.send(JSON.stringify(message));
