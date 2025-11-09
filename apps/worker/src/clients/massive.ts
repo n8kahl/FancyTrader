@@ -1,10 +1,43 @@
-import axios, { type AxiosError } from "axios";
+import axios, { type AxiosInstance, type AxiosError } from "axios";
+import { scanFailure } from "../lib/metrics.js";
 
 const BASE_URL = (process.env.MASSIVE_BASE_URL ?? "https://api.massive.com").replace(/\/+$/, "");
-const V3 = `${BASE_URL}/v3`;
-const V2 = `${BASE_URL}/v2`;
-const API_KEY = process.env.MASSIVE_API_KEY;
-if (!API_KEY) throw new Error("MASSIVE_API_KEY is required");
+const API_URL_V3 = `${BASE_URL}/v3`;
+const API_URL_V2 = `${BASE_URL}/v2`;
+
+export class NotConfiguredError extends Error {
+  constructor(message = "MASSIVE_API_KEY not configured") {
+    super(message);
+    this.name = "NotConfiguredError";
+  }
+}
+
+let httpV3: AxiosInstance | null = null;
+let httpV2: AxiosInstance | null = null;
+
+function ensureHttpV3(): AxiosInstance {
+  if (httpV3) return httpV3;
+  const apiKey = process.env.MASSIVE_API_KEY;
+  if (!apiKey) throw new NotConfiguredError();
+  httpV3 = axios.create({
+    baseURL: API_URL_V3,
+    params: { apiKey },
+    timeout: 10_000,
+  });
+  return httpV3;
+}
+
+function ensureHttpV2(): AxiosInstance {
+  if (httpV2) return httpV2;
+  const apiKey = process.env.MASSIVE_API_KEY;
+  if (!apiKey) throw new NotConfiguredError();
+  httpV2 = axios.create({
+    baseURL: API_URL_V2,
+    params: { apiKey },
+    timeout: 10_000,
+  });
+  return httpV2;
+}
 
 function logHttpError(error: unknown) {
   if (axios.isAxiosError(error)) {
@@ -19,59 +52,60 @@ function logHttpError(error: unknown) {
   console.error(String(error));
 }
 
-const httpV3 = axios.create({ baseURL: V3, params: { apiKey: API_KEY }, timeout: 10_000 });
-const httpV2 = axios.create({ baseURL: V2, params: { apiKey: API_KEY }, timeout: 10_000 });
+const onNotConfigured = (label: string): void => {
+  console.warn(`Massive not configured; skipping ${label}`);
+  scanFailure?.labels?.("config")?.inc?.();
+};
 
-export async function snapshotIndices(symbols: string[]) {
+async function withMassive<T>(label: string, fn: () => Promise<T>): Promise<T | undefined> {
   try {
-    const { data } = await httpV3.get("/snapshot/indices", { params: { symbols: symbols.join(",") } });
-    return data;
+    return await fn();
   } catch (error) {
-    logHttpError(error);
+    if ((error as Error).name === "NotConfiguredError") {
+      onNotConfigured(label);
+      return undefined;
+    }
     throw error;
   }
+}
+
+export async function snapshotIndices(symbols: string[]) {
+  return withMassive("snapshotIndices", async () => {
+    const { data } = await ensureHttpV3().get("/snapshot/indices", {
+      params: { symbols: symbols.join(",") },
+    });
+    return data;
+  });
 }
 
 export async function optionChainSnapshot(underlying: string) {
-  try {
-    const { data } = await httpV3.get(`/snapshot/options/${encodeURIComponent(underlying)}`);
+  return withMassive("optionChainSnapshot", async () => {
+    const { data } = await ensureHttpV3().get(`/snapshot/options/${encodeURIComponent(underlying)}`);
     return data;
-  } catch (error) {
-    logHttpError(error);
-    throw error;
-  }
+  });
 }
 
 export async function optionContractSnapshot(underlying: string, contract: string) {
-  try {
-    const { data } = await httpV3.get(
+  return withMassive("optionContractSnapshot", async () => {
+    const { data } = await ensureHttpV3().get(
       `/snapshot/options/${encodeURIComponent(underlying)}/${encodeURIComponent(contract)}`
     );
     return data;
-  } catch (error) {
-    logHttpError(error);
-    throw error;
-  }
+  });
 }
 
 export async function optionQuote(contract: string) {
-  try {
-    const { data } = await httpV3.get(`/quotes/${encodeURIComponent(contract)}`);
+  return withMassive("optionQuote", async () => {
+    const { data } = await ensureHttpV3().get(`/quotes/${encodeURIComponent(contract)}`);
     return data;
-  } catch (error) {
-    logHttpError(error);
-    throw error;
-  }
+  });
 }
 
 export async function indexPrevBar(symbol: string) {
-  try {
-    const { data } = await httpV2.get(`/aggs/ticker/${encodeURIComponent(symbol)}/prev`);
+  return withMassive("indexPrevBar", async () => {
+    const { data } = await ensureHttpV2().get(`/aggs/ticker/${encodeURIComponent(symbol)}/prev`);
     return data;
-  } catch (error) {
-    logHttpError(error);
-    throw error;
-  }
+  });
 }
 
 const OCC_RE = /^[A-Z]{1,6}\d{6}[CP]\d{8}$/;

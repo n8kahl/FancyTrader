@@ -5,8 +5,18 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { aggQuerySchema, symbolParamSchema, cursorContractsQuerySchema } from "../validation/schemas.js";
 import { badRequest, internalError } from "../utils/httpError.js";
 
-const massive = new MassiveClient();
 const polygonClient = new PolygonClient();
+let _massive: MassiveClient | null = null;
+function getMassive(): MassiveClient {
+  if (_massive) return _massive;
+  const key = process.env.MASSIVE_API_KEY;
+  if (!key) throw new Error("MASSIVE_API_KEY not configured");
+  _massive = new MassiveClient({
+    apiKey: key,
+    baseUrl: process.env.MASSIVE_BASE_URL,
+  });
+  return _massive;
+}
 
 function normalizeMarketSession(rawResponse: unknown) {
   const raw = typeof rawResponse === "object" && rawResponse !== null ? rawResponse : {};
@@ -46,8 +56,14 @@ export function setupMarketDataRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       const { symbol } = symbolParamSchema.parse(req.params);
       const normalizedSymbol = symbol.toUpperCase();
-      const snapshot = await massive.getTickerSnapshot(normalizedSymbol);
-      res.json({ symbol: normalizedSymbol, data: snapshot });
+      try {
+        const snapshot = await getMassive().getTickerSnapshot(normalizedSymbol);
+        res.json({ symbol: normalizedSymbol, data: snapshot });
+      } catch (error) {
+        res
+          .status(503)
+          .json({ error: "Massive not configured", detail: (error as Error).message ?? String(error) });
+      }
     })
   );
 
@@ -108,13 +124,19 @@ export function setupMarketDataRoutes(app: Express): void {
     asyncHandler(async (req, res) => {
       const { symbol } = symbolParamSchema.parse(req.params);
       const normalizedSymbol = symbol.toUpperCase();
-      const aggs = (await massive.getMinuteAggs(normalizedSymbol, 390)) as any;
-      const results = Array.isArray(aggs?.results) ? aggs.results : [];
-      if (!results.length) {
-        res.status(404).json({ error: "Previous close data not found" });
-        return;
+      try {
+        const aggs = (await getMassive().getMinuteAggs(normalizedSymbol, 390)) as any;
+        const results = Array.isArray(aggs?.results) ? aggs.results : [];
+        if (!results.length) {
+          res.status(404).json({ error: "Previous close data not found" });
+          return;
+        }
+        res.json({ symbol: normalizedSymbol, data: results[results.length - 1] });
+      } catch (error) {
+        res
+          .status(503)
+          .json({ error: "Massive not configured", detail: (error as Error).message ?? String(error) });
       }
-      res.json({ symbol: normalizedSymbol, data: results[results.length - 1] });
     })
   );
 
@@ -124,8 +146,14 @@ export function setupMarketDataRoutes(app: Express): void {
   app.get(
     "/api/market/status",
     asyncHandler(async (_req, res) => {
-      const status = await massive.getMarketStatus();
-      res.json(normalizeMarketSession(status));
+      try {
+        const status = await getMassive().getMarketStatus();
+        res.json(normalizeMarketSession(status));
+      } catch (error) {
+        res
+          .status(503)
+          .json({ error: "Massive not configured", detail: (error as Error).message ?? String(error) });
+      }
     })
   );
 }
