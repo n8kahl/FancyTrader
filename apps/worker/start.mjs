@@ -63,6 +63,15 @@ const runOnce = async (ctx = {}) => {
 
   let snapshot_backed = false;
   let snapshot_count = 0;
+  const FRESH_MINUTES = 48 * 60;
+  const cutoff = Date.now() - FRESH_MINUTES * 60_000;
+  const diag = {
+    expected: WATCH_SYMBOLS.length,
+    got: snapshot_count,
+    fresh: [],
+    stale: [],
+    missing: [],
+  };
   if (session === "closed" && sb && WATCH_SYMBOLS.length) {
     const { data: snaps, error } = await sb
       .from("trade_snapshots")
@@ -79,7 +88,27 @@ const runOnce = async (ctx = {}) => {
         }
       }
       snapshot_count = seen.size;
+      diag.got = snapshot_count;
       snapshot_backed = snapshot_count > 0;
+      const latest = new Map();
+      for (const snap of snaps) {
+        if (!latest.has(snap.symbol)) {
+          latest.set(snap.symbol, snap);
+        }
+      }
+      for (const sym of WATCH_SYMBOLS) {
+        const row = latest.get(sym);
+        if (!row) {
+          diag.missing.push(sym);
+          continue;
+        }
+        const ts = new Date(row.asof).getTime();
+        if (ts >= cutoff) {
+          diag.fresh.push(sym);
+        } else {
+          diag.stale.push({ symbol: sym, age_min: Math.round((Date.now() - ts) / 60000) });
+        }
+      }
     }
   }
   const start = Date.now();
@@ -88,7 +117,9 @@ const runOnce = async (ctx = {}) => {
   let info = null;
   let durationMs = null;
   const reason = ctx.reason ?? "auto";
-  const metaPayload = ctx.meta ?? { reason, worker: "apps/worker" };
+  const baseMeta = ctx.meta ?? { reason, worker: "apps/worker" };
+  const metaPayload =
+    session === "closed" ? { ...baseMeta, snapshots: diag } : baseMeta;
   try {
     info = await triggerRun(runCtx);
     scanSuccess.inc();
