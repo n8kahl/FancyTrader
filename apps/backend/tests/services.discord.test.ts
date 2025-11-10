@@ -26,11 +26,11 @@ const originalEnv = {
   timeout: process.env.DISCORD_TIMEOUT_MS,
 };
 
-const buildApp = (): Express => {
+const buildApp = async (): Promise<Express> => {
   jest.resetModules();
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { createApp } = require("../src/app") as typeof import("../src/app");
-  return createApp().app;
+  return (await createApp()).app;
 };
 
 const setDefaultEnv = (): void => {
@@ -91,7 +91,7 @@ describe("Discord sharing resiliency", () => {
   });
 
   it("retries on Discord errors and eventually succeeds", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const scope = nock(base)
       .post(path)
@@ -110,7 +110,7 @@ describe("Discord sharing resiliency", () => {
   });
 
   it("returns cached response when idempotency key repeats", async () => {
-    const app = buildApp();
+    const app = await buildApp();
     const key = "duplicate-key";
 
     const scope = nock(base).post(path).reply(204);
@@ -134,7 +134,7 @@ describe("Discord sharing resiliency", () => {
   });
 
   it("fails with 502 after max retries", async () => {
-    const app = buildApp();
+    const app = await buildApp();
 
     const scope = nock(base).post(path).times(3).reply(500, { error: "server" });
 
@@ -150,7 +150,7 @@ describe("Discord sharing resiliency", () => {
 
   it("short-circuits when Discord integration disabled", async () => {
     process.env.DISCORD_ENABLED = "false";
-    const app = buildApp();
+    const app = await buildApp();
 
     const res = await request(app).post("/api/share/discord/trade").send(tradePayload);
 

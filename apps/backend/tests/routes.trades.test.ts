@@ -5,21 +5,21 @@ import type { Express } from "express";
 
 const userId = "11111111-1111-1111-1111-111111111111";
 
-function loadApp(): Express {
+async function loadApp(): Promise<Express> {
   const { createApp } = require("../src/app");
-  return createApp().app;
+  return (await createApp()).app;
 }
 
 describe("/api/trades route - memory fallback", () => {
   let app: Express;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.TRADES_MEMORY_STORE = "true";
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_KEY;
     delete process.env.SUPABASE_ANON_KEY;
     jest.resetModules();
-    app = loadApp();
+    app = await loadApp();
   });
 
   it("requires a user id", async () => {
@@ -52,7 +52,7 @@ describe("/api/trades route - memory fallback", () => {
 describe("/api/trades route - supabase adapter", () => {
   let app: Express;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.TRADES_MEMORY_STORE = "false";
     jest.resetModules();
     jest.doMock("../src/services/tradeService", () => {
@@ -88,7 +88,7 @@ describe("/api/trades route - supabase adapter", () => {
         }),
       };
     });
-    app = loadApp();
+    app = await loadApp();
   });
 
   afterEach(() => {

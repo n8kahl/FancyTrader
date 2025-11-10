@@ -28,7 +28,7 @@ const boolFromEnv = (value: string | undefined, fallback: boolean): boolean => {
 
 const streamingEnabled = boolFromEnv(process.env.STREAMING_ENABLED, true);
 
-const { app, services } = createApp();
+const { app, services } = await createApp();
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 globalThis.__WSS_READY__ = false;

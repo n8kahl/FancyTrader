@@ -22,13 +22,20 @@ const sharePayload = {
   },
 };
 
-const buildApp = (): Express => {
+const buildApp = async (): Promise<Express> => {
   let built: Express | undefined;
+  let builtPromise: Promise<void> | undefined;
   jest.isolateModules(() => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { createApp } = require("../src/app") as typeof import("../src/app");
-    built = createApp().app;
+    builtPromise = createApp().then(({ app }) => {
+      built = app;
+    });
   });
+  if (!builtPromise) {
+    throw new Error("Failed to initialize app builder");
+  }
+  await builtPromise;
   if (!built) {
     throw new Error("Failed to build app instance");
   }
@@ -59,7 +66,7 @@ describe("rate limit middleware", () => {
   it("allows multiple alert requests under the threshold", async () => {
     process.env.RATE_LIMIT_MAX = "5";
     delete process.env.DISCORD_WEBHOOK_URL;
-    const app = buildApp();
+    const app = await buildApp();
 
     for (let i = 0; i < 3; i += 1) {
       await request(app).post("/api/alerts").send(alertPayload).expect(201);
@@ -69,7 +76,7 @@ describe("rate limit middleware", () => {
   it("blocks share trade requests once the limit is reached", async () => {
     process.env.RATE_LIMIT_MAX = "2";
     delete process.env.DISCORD_WEBHOOK_URL;
-    const app = buildApp();
+    const app = await buildApp();
 
     for (let i = 0; i < 2; i += 1) {
       await request(app).post("/api/share/discord/trade").send(sharePayload).expect(409);
@@ -83,7 +90,7 @@ describe("rate limit middleware", () => {
   it("blocks share alert requests once the limit is reached", async () => {
     process.env.RATE_LIMIT_MAX = "2";
     delete process.env.DISCORD_WEBHOOK_URL;
-    const app = buildApp();
+    const app = await buildApp();
 
     const customPayload = { symbol: "SPY", type: "TRIM_50", content: "Trim" };
 

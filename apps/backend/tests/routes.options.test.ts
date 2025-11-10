@@ -1,6 +1,7 @@
 import request from "supertest";
 import nock from "nock";
 import type { AppServices } from "../src/app";
+import type { Express } from "express";
 import { createApp } from "../src/app";
 import { AlertRegistry } from "../src/alerts/registry";
 import { defaultStrategyParams } from "../src/config/strategy.defaults";
@@ -52,11 +53,12 @@ const buildMockServices = (): AppServices => {
 describe("options routes", () => {
   const polygonApi = "https://api.massive.com";
   const services = buildMockServices();
-  const { app } = createApp({ services });
+  let app: Express;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     nock.disableNetConnect();
     nock.enableNetConnect("127.0.0.1");
+    ({ app } = await createApp({ services }));
   });
 
   afterEach(() => {

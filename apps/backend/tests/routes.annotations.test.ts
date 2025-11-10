@@ -5,18 +5,18 @@ import request from "supertest";
 
 const userId = "11111111-1111-1111-1111-111111111111";
 
-function loadApp(): Express {
+async function loadApp(): Promise<Express> {
   const { createApp } = require("../src/app");
-  return createApp().app;
+  return (await createApp()).app;
 }
 
 describe("/api/chart/annotations - memory fallback", () => {
   let app: Express;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.ANNOTATIONS_MEMORY_STORE = "true";
     jest.resetModules();
-    app = loadApp();
+    app = await loadApp();
   });
 
   it("rejects missing user id", async () => {
@@ -60,7 +60,7 @@ describe("/api/chart/annotations - memory fallback", () => {
 describe("/api/chart/annotations - service wiring", () => {
   let app: Express;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     process.env.ANNOTATIONS_MEMORY_STORE = "false";
     jest.resetModules();
     jest.doMock("../src/services/annotationService", () => {
@@ -98,7 +98,7 @@ describe("/api/chart/annotations - service wiring", () => {
         }),
       };
     });
-    app = loadApp();
+    app = await loadApp();
   });
 
   afterEach(() => {

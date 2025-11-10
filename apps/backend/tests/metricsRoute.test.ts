@@ -1,15 +1,17 @@
 import { afterAll, beforeAll, describe, expect, it } from "@jest/globals";
 import request from "supertest";
+import type { Express } from "express";
 import { createApp } from "../src/app";
 
-const { app } = createApp();
+let app: Express;
 
 describe("/api/metrics", () => {
   const adminKey = "test-admin-key";
   const original = process.env.ADMIN_KEY;
 
-  beforeAll(() => {
+  beforeAll(async () => {
     process.env.ADMIN_KEY = adminKey;
+    ({ app } = await createApp());
   });
 
   afterAll(() => {

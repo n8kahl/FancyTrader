@@ -115,10 +115,7 @@ export interface CreateAppResult {
   services: AppServices;
 }
 
-let massiveStream: MassiveStreamingService | undefined;
-let massiveStreamStarted = false;
-
-export function createApp(options: CreateAppOptions = {}): CreateAppResult {
+export async function createApp(options: CreateAppOptions = {}): Promise<CreateAppResult> {
   const allowedOrigins = computeAllowedOrigins();
 
   const strategyDetector =
@@ -217,48 +214,66 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
 
   app.use(errorHandler);
 
-  const enableMassiveStream = process.env.FEATURE_ENABLE_MASSIVE_STREAM === "true";
-  if (enableMassiveStream && !massiveStreamStarted) {
-    const apiKey = process.env.MASSIVE_API_KEY;
-    if (!apiKey) {
-      logger.warn("FEATURE_ENABLE_MASSIVE_STREAM is enabled but MASSIVE_API_KEY is missing");
-    } else {
-      massiveStream = new MassiveStreamingService({
+  const ENABLE_POLYGON = process.env.FEATURE_ENABLE_POLYGON_STREAM === "true";
+  const ENABLE_MASSIVE = process.env.FEATURE_ENABLE_MASSIVE_STREAM === "true";
+  const STREAMING_ENABLED = process.env.STREAMING_ENABLED === "true";
+
+  log.info(
+    { STREAMING_ENABLED, ENABLE_POLYGON, ENABLE_MASSIVE },
+    "Streaming feature flags"
+  );
+
+  let streaming: { start: () => Promise<void>; stop?: () => Promise<void> } | null = null;
+
+  if (STREAMING_ENABLED) {
+    if (ENABLE_POLYGON) {
+      const key = process.env.POLYGON_API_KEY;
+      if (!key) {
+        throw new Error("POLYGON_API_KEY required when FEATURE_ENABLE_POLYGON_STREAM=true");
+      }
+      await import("./services/polygonStreamingService.js"); // ensure module is loaded when needed
+      streaming = {
+        start: () => polygonService.connect(),
+        stop: () => polygonService.disconnect(),
+      };
+      log.info("Polygon streaming enabled");
+    } else if (ENABLE_MASSIVE) {
+      const key = process.env.MASSIVE_API_KEY;
+      if (!key) {
+        throw new Error("MASSIVE_API_KEY required when FEATURE_ENABLE_MASSIVE_STREAM=true");
+      }
+      const massive = new MassiveStreamingService({
         baseUrl: process.env.MASSIVE_WS_BASE || "wss://socket.massive.com",
         cluster: process.env.MASSIVE_WS_CLUSTER || "options",
-        apiKey,
+        apiKey: key,
         subscriptions: [],
         logger: (event, meta) => logger.debug("massive_ws", { event, ...meta }),
       });
-
-      massiveStream.on("message", (msg) => logger.debug("massive_ws_message", { msg }));
-      massiveStream.on("error", (error) => logger.error("massive_ws_error", { error }));
-      massiveStream.start();
-      massiveStreamStarted = true;
+      massive.on("message", (msg) => logger.debug("massive_ws_message", { msg }));
+      massive.on("error", (error) => logger.error("massive_ws_error", { error }));
+      streaming = {
+        start: async () => {
+          massive.start();
+        },
+        stop: async () => {
+          massive.stop();
+        },
+      };
+      log.info("Massive streaming enabled");
+    } else {
+      log.warn("STREAMING_ENABLED=true but no provider flag is set; streaming skipped");
     }
-  }
-
-
-  const STREAMING_ENABLED = process.env.STREAMING_ENABLED
-    ? process.env.STREAMING_ENABLED === "true"
-    : true;
-  const POLY_ON = process.env.FEATURE_POLYGON_ENABLED
-    ? process.env.FEATURE_POLYGON_ENABLED === "true"
-    : true;
-  if (STREAMING_ENABLED && POLY_ON) {
-    if (!process.env.POLYGON_API_KEY) {
-      throw new Error("POLYGON_API_KEY required when streaming is enabled");
-    }
-    polygonService
-      .connect()
-      .then(() => log.info("Polygon streaming started"))
-      .catch((error) => {
-        log.error({ error }, "Polygon streaming failed to start");
-      });
   } else {
-    log.info({ STREAMING_ENABLED, POLY_ON }, "Polygon streaming disabled");
+    log.warn("All streaming disabled by STREAMING_ENABLED flag");
   }
 
+  if (streaming) {
+    try {
+      await streaming.start();
+    } catch (error) {
+      log.error({ error }, "Streaming failed to start");
+    }
+  }
 
   return { app, services };
 }

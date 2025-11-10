@@ -6,13 +6,20 @@ import type { Express } from "express";
 const base = "https://discord.com";
 const path = "/api/webhooks/123/custom";
 
-const buildApp = (): Express => {
+const buildApp = async (): Promise<Express> => {
   let built: Express | undefined;
+  let builtPromise: Promise<void> | undefined;
   jest.isolateModules(() => {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { createApp } = require("../src/app") as typeof import("../src/app");
-    built = createApp().app;
+    builtPromise = createApp().then(({ app }) => {
+      built = app;
+    });
   });
+  if (!builtPromise) {
+    throw new Error("Failed to create app instance");
+  }
+  await builtPromise;
   if (!built) {
     throw new Error("Failed to create app instance");
   }
@@ -34,7 +41,7 @@ afterEach(() => {
 describe("POST /api/share/discord/alert", () => {
   it("returns 409 when Discord is disabled", async () => {
     process.env.DISCORD_ENABLED = "false";
-    const app = buildApp();
+    const app = await buildApp();
 
     const res = await request(app).post("/api/share/discord/alert").send(payload);
 
@@ -45,7 +52,7 @@ describe("POST /api/share/discord/alert", () => {
   it("sends alert when Discord configured", async () => {
     process.env.DISCORD_ENABLED = "true";
     process.env.DISCORD_WEBHOOK_URL = `${base}${path}`;
-    const app = buildApp();
+    const app = await buildApp();
 
     const scope = nock(base).post(path).reply(204);
 

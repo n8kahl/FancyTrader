@@ -58,7 +58,7 @@ describe("Watchlist compatibility routes", () => {
   const userId = "test-user";
 
   it("adds, fetches, and removes a symbol", async () => {
-    const { app } = createApp({ services: buildServices() });
+    const { app } = await createApp({ services: buildServices() });
 
     await request(app)
       .post("/api/watchlist")
