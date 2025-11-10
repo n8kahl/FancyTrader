@@ -28,71 +28,78 @@ const boolFromEnv = (value: string | undefined, fallback: boolean): boolean => {
 
 const streamingEnabled = boolFromEnv(process.env.STREAMING_ENABLED, true);
 
-const { app, services, streaming } = await createApp();
-const server = createServer(app);
-const wss = new WebSocketServer({ server, path: "/ws" });
-globalThis.__WSS_READY__ = false;
+try {
+  const { app, services, streaming } = await createApp();
+  const server = createServer(app);
+  const wss = new WebSocketServer({ server, path: "/ws" });
+  globalThis.__WSS_READY__ = false;
 
-const polygonClient = new PolygonClient();
+  const polygonClient = new PolygonClient();
 
-const broadcastAlert = (payload: AlertBroadcastPayload): void => {
-  const message: ServerOutbound = { type: "alert", ...payload };
-  const serialized = JSON.stringify(message);
-  for (const client of wss.clients) {
-    if (client.readyState === client.OPEN) {
-      client.send(serialized);
+  const broadcastAlert = (payload: AlertBroadcastPayload): void => {
+    const message: ServerOutbound = { type: "alert", ...payload };
+    const serialized = JSON.stringify(message);
+    for (const client of wss.clients) {
+      if (client.readyState === client.OPEN) {
+        client.send(serialized);
+      }
     }
-  }
-};
+  };
 
-const alertEvaluator = new AlertEvaluator(services.alertRegistry, polygonClient, broadcastAlert);
+  const alertEvaluator = new AlertEvaluator(services.alertRegistry, polygonClient, broadcastAlert);
 
-setupWebSocketHandler(
-  wss,
-  { strategyDetector: services.strategyDetector },
-  { enableStreaming: streamingEnabled }
-);
+  setupWebSocketHandler(
+    wss,
+    { strategyDetector: services.strategyDetector },
+    { enableStreaming: streamingEnabled }
+  );
 
-if (!streamingEnabled) {
-  logger.warn("Massive streaming disabled via STREAMING_ENABLED env");
-}
-
-alertEvaluator.start();
-globalThis.__WSS_READY__ = true;
-wss.on("close", () => {
-  globalThis.__WSS_READY__ = false;
-});
-
-const PORT = process.env.PORT || 8080;
-
-server.listen(PORT, () => {
-  logger.info(`🚀 Fancy Trader Backend running on port ${PORT}`);
-  logger.info(`WebSocket available at ws://localhost:${PORT}/ws`);
-  logger.info(`Environment: ${process.env.NODE_ENV}`);
-  if (streaming) {
-    void streaming.start().catch((error) => logger.error({ error }, "Streaming failed to start"));
-  }
-});
-
-process.on("SIGTERM", async () => {
-  logger.info("SIGTERM received, shutting down gracefully...");
-  alertEvaluator.stop();
-
-  globalThis.__WSS_READY__ = false;
-  wss.clients.forEach((client) => client.close());
-  wss.close();
-
-  if (streaming) {
-    await streaming.stop();
+  if (!streamingEnabled) {
+    logger.warn("Massive streaming disabled via STREAMING_ENABLED env");
   }
 
-  server.close(() => {
-    logger.info("Server closed");
-    process.exit(0);
+  alertEvaluator.start();
+  globalThis.__WSS_READY__ = true;
+  wss.on("close", () => {
+    globalThis.__WSS_READY__ = false;
   });
 
-  setTimeout(() => {
-    logger.error("Forced shutdown after timeout");
-    process.exit(1);
-  }, 10000);
-});
+  const PORT = process.env.PORT || 8080;
+
+    server.listen(PORT, () => {
+      logger.info(`🚀 Fancy Trader Backend running on port ${PORT}`);
+      logger.info(`WebSocket available at ws://localhost:${PORT}/ws`);
+      logger.info(`Environment: ${process.env.NODE_ENV}`);
+      if (streaming) {
+        void streaming.start().catch((error) =>
+          logger.error("Streaming failed to start", { error })
+        );
+      }
+    });
+
+  process.on("SIGTERM", async () => {
+    logger.info("SIGTERM received, shutting down gracefully...");
+    alertEvaluator.stop();
+
+    globalThis.__WSS_READY__ = false;
+    wss.clients.forEach((client) => client.close());
+    wss.close();
+
+    if (streaming) {
+      await streaming.stop();
+    }
+
+    server.close(() => {
+      logger.info("Server closed");
+      process.exit(0);
+    });
+
+    setTimeout(() => {
+      logger.error("Forced shutdown after timeout");
+      process.exit(1);
+    }, 10000);
+  });
+} catch (err) {
+  logger.error("fatal error while starting backend", { err });
+  process.exit(1);
+}

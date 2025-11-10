@@ -265,5 +265,5 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
     log.warn("Streaming disabled via STREAMING_ENABLED");
   }
 
-  return { app, services };
+  return { app, services, streaming };
 }
