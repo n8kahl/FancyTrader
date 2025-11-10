@@ -50,6 +50,10 @@ const sb =
   supabaseUrl && supabaseSvc
     ? createClient(supabaseUrl, supabaseSvc, { auth: { persistSession: false } })
     : null;
+const WATCH_SYMBOLS = (process.env.WORKER_SYMBOLS ?? "SPY,QQQ")
+  .split(",")
+  .map((symbol) => symbol.trim().toUpperCase())
+  .filter(Boolean);
 
 const runOnce = async (ctx = {}) => {
   const session = normalizeSession(ctx.session ?? process.env.WORKER_FORCE_SESSION);
@@ -57,6 +61,27 @@ const runOnce = async (ctx = {}) => {
   const runCtx = { ...ctx, session, noop };
   runCtx.forceSession = session;
 
+  let snapshot_backed = false;
+  let snapshot_count = 0;
+  if (session === "closed" && sb && WATCH_SYMBOLS.length) {
+    const { data: snaps, error } = await sb
+      .from("trade_snapshots")
+      .select("symbol, asof")
+      .in("symbol", WATCH_SYMBOLS)
+      .order("asof", { ascending: false });
+    if (error) {
+      console.warn("[snapshots query error]", error);
+    } else if (snaps && snaps.length) {
+      const seen = new Set();
+      for (const snap of snaps) {
+        if (snap?.symbol) {
+          seen.add(snap.symbol);
+        }
+      }
+      snapshot_count = seen.size;
+      snapshot_backed = snapshot_count > 0;
+    }
+  }
   const start = Date.now();
   jobsInflight.inc();
   let resultLabel = "success";
@@ -80,8 +105,8 @@ const runOnce = async (ctx = {}) => {
         status: "success",
         session,
         noop,
-        snapshot_backed: Boolean(info?.snapshot_backed ?? false),
-        snapshot_count: Number.isFinite(info?.snapshot_count) ? info.snapshot_count : 0,
+        snapshot_backed,
+        snapshot_count,
         duration_ms: durationMs,
         meta: metaPayload,
       };
