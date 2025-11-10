@@ -29,21 +29,28 @@ const scanLatencyMs = new promClient.Histogram({
   labelNames: ["session", "noop", "result"],
 });
 
-function forcedSessionFromEnv() {
-  const sessionEnv = process.env.WORKER_FORCE_SESSION?.toString().toLowerCase();
-  if (sessionEnv === "open" || sessionEnv === "closed") {
-    return sessionEnv;
-  }
-  return null;
+function normalizeSession(input) {
+  return String(input).toLowerCase() === "open" ? "open" : "closed";
 }
 
-function labels(opts = {}) {
-  const forced = forcedSessionFromEnv();
-  const sessionRaw = (opts.session ?? "").toString().toLowerCase();
-  const detected = sessionRaw === "open" || sessionRaw === "closed" ? sessionRaw : null;
-  const session = forced ?? detected ?? "unknown";
-  const noop = Boolean(opts.noop);
-  return { session, noop: String(noop) };
+function normalizeNoop(input) {
+  if (typeof input === "string") {
+    return input.toLowerCase() === "true";
+  }
+  return Boolean(input);
+}
+
+function buildRunParams(partial = {}) {
+  const rawSession =
+    partial.session ??
+    process.env.WORKER_FORCE_SESSION ??
+    "closed";
+  const rawNoop = partial.noop ?? process.env.WORKER_NOOP ?? false;
+  return {
+    ...partial,
+    session: normalizeSession(rawSession),
+    noop: normalizeNoop(rawNoop),
+  };
 }
 
 const log = (...a) => console.log(...a);
@@ -56,11 +63,10 @@ const sb =
     : null;
 
 const runOnce = async (ctx = {}) => {
-  const { session, noop } = labels(ctx);
-  const runCtx = { ...ctx };
-  if (session !== "unknown") {
-    runCtx.forceSession = session;
-  }
+  const session = ctx.session ?? normalizeSession("closed");
+  const noop = ctx.noop ?? normalizeNoop(false);
+  const runCtx = { ...ctx, session, noop };
+  runCtx.forceSession = session;
 
   const start = Date.now();
   jobsInflight.inc();
@@ -71,7 +77,8 @@ const runOnce = async (ctx = {}) => {
   try {
     info = await triggerRun(runCtx);
     scanSuccess.inc();
-    scanRunsTotal.labels(session, noop, "success").inc();
+    const noopLabel = String(noop);
+    scanRunsTotal.labels(session, noopLabel, "success").inc();
     log("[diag] main() returned", { session, noop, reason });
     durationMs = Math.max(0, Math.round(Date.now() - start));
     if (sb) {
@@ -106,13 +113,14 @@ const runOnce = async (ctx = {}) => {
     resultLabel = "failure";
     durationMs = Math.max(0, Math.round(Date.now() - start));
     scanFailure.inc();
-    scanRunsTotal.labels(session, noop, "failure").inc();
+    const noopLabel = String(noop);
+    scanRunsTotal.labels(session, noopLabel, "failure").inc();
     console.error("[metrics] run failed", e);
   } finally {
     if (durationMs === null) {
       durationMs = Math.max(0, Math.round(Date.now() - start));
     }
-    scanLatencyMs.labels(session, noop, resultLabel).observe(durationMs);
+    scanLatencyMs.labels(session, String(noop), resultLabel).observe(durationMs);
     jobsInflight.dec();
   }
 };
@@ -133,26 +141,21 @@ app.get("/metrics", async (_req, res) => {
 });
 
 app.post("/run-now", (req, res) => {
-  const sessionRaw = (
-    req.query.session ?? req.body?.session ?? ""
-  )
-    .toString()
-    .toLowerCase();
-  const session = sessionRaw === "open" || sessionRaw === "closed" ? sessionRaw : "unknown";
-
-  const noopRaw = (
-    req.query.noop ?? req.body?.noop ?? ""
-  )
-    .toString()
-    .toLowerCase();
-  const noop = ["1", "true", "yes", "on"].includes(noopRaw);
+  const rawSession =
+    (req.query.session && String(req.query.session)) ||
+    process.env.WORKER_FORCE_SESSION ||
+    "closed";
+  const rawNoop = req.query.noop ?? process.env.WORKER_NOOP ?? "false";
+  const session = normalizeSession(rawSession);
+  const noop = normalizeNoop(rawNoop);
 
   console.log("[run-now] received", { session, noop });
 
   res.json({ ok: true, accepted: true, session, noop, ts: new Date().toISOString() });
 
+  const runParams = buildRunParams({ session, noop, reason: "manual" });
   queueMicrotask(() => {
-    runOnce({ session, noop, reason: "manual" })
+    runOnce(runParams)
       .then(() => console.log("[run-now] completed", { session, noop }))
       .catch((e) => console.error("[run-now] error", e));
   });
@@ -161,10 +164,13 @@ app.post("/run-now", (req, res) => {
 const EVERY = Number(process.env.WORKER_EVERY_MS) || 60000;
 const PORT = Number(process.env.PORT) || 8080;
 
-void runOnce();
-setInterval(() => {
-  void runOnce();
-}, EVERY);
+const scheduledRun = () => {
+  const params = buildRunParams({ reason: "scheduled" });
+  void runOnce(params);
+};
+
+void scheduledRun();
+setInterval(scheduledRun, EVERY);
 
 app.listen(PORT, "0.0.0.0", () => {
   log("[diag] web listening", { PORT });
