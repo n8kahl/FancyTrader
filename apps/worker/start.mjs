@@ -76,6 +76,12 @@ const runOnce = async (ctx = {}) => {
     durationMs = Math.max(0, Math.round(Date.now() - start));
     if (sb) {
       const nowIso = new Date().toISOString();
+      const metaPayload =
+        info?.meta ?? {
+          reason: info?.reason ?? reason ?? "auto",
+          worker: "apps/worker",
+        };
+
       const payload = {
         inserted_at: nowIso,
         window_start: nowIso,
@@ -85,10 +91,7 @@ const runOnce = async (ctx = {}) => {
         snapshot_backed: Boolean(info?.snapshot_backed ?? false),
         snapshot_count: Number.isFinite(info?.snapshot_count) ? info.snapshot_count : 0,
         duration_ms: durationMs,
-        meta: {
-          reason: info?.reason ?? reason ?? "auto",
-          worker: "apps/worker",
-        },
+        meta: metaPayload,
       };
       await sb
         .from("scan_runs")
