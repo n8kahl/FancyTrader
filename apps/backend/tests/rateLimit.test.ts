@@ -1,4 +1,4 @@
-import { describe, expect, it, afterAll } from "@jest/globals";
+import {describe, expect, it, afterAll} from "vitest";
 import request from "supertest";
 import type { Express } from "express";
 

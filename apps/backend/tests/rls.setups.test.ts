@@ -1,4 +1,4 @@
-import { describe, expect, it } from "@jest/globals";
+import {describe, expect, it} from "vitest";
 import { randomUUID } from "node:crypto";
 import { SupabaseSetupsService, type SetupRecord } from "../src/services/supabaseSetups";
 

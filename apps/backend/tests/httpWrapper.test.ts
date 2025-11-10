@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "@jest/globals";
+import {describe, expect, it, afterEach} from "vitest";
 import nock from "nock";
 import { HttpClient } from "../src/utils/http";
 

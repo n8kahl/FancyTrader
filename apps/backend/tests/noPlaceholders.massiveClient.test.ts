@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, it, expect } from "@jest/globals";
+import {describe, it, expect} from "vitest";
 
 describe("No placeholders in MassiveClient", () => {
   it("packages/shared/src/client/massive.ts has no '...'", () => {

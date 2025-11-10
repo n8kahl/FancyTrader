@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
+import {describe, expect, it, beforeEach, afterEach} from "vitest";
 import request from "supertest";
 import type { Express } from "express";
 
@@ -61,8 +61,8 @@ describe("/api/trades route - supabase adapter", () => {
       const clone = () => store.map((t) => ({ ...t }));
       return {
         ...actual,
-        listTrades: jest.fn(async (owner: string) => clone().filter((t) => t.owner === owner)),
-        createTrade: jest.fn(async (owner: string, payload: any) => {
+        listTrades: vi.fn(async (owner: string) => clone().filter((t) => t.owner === owner)),
+        createTrade: vi.fn(async (owner: string, payload: any) => {
           const record = {
             id: `mock-${store.length}`,
             owner,
@@ -74,14 +74,14 @@ describe("/api/trades route - supabase adapter", () => {
           store = [record, ...store];
           return record;
         }),
-        getTrade: jest.fn(async (owner: string, id: string) => store.find((t) => t.owner === owner && t.id === id) ?? null),
-        updateTrade: jest.fn(async (owner: string, id: string, partial: any) => {
+        getTrade: vi.fn(async (owner: string, id: string) => store.find((t) => t.owner === owner && t.id === id) ?? null),
+        updateTrade: vi.fn(async (owner: string, id: string, partial: any) => {
           const idx = store.findIndex((t) => t.owner === owner && t.id === id);
           if (idx === -1) return null;
           store[idx] = { ...store[idx], ...partial };
           return store[idx];
         }),
-        deleteTrade: jest.fn(async (owner: string, id: string) => {
+        deleteTrade: vi.fn(async (owner: string, id: string) => {
           const before = store.length;
           store = store.filter((t) => !(t.owner === owner && t.id === id));
           return store.length !== before;

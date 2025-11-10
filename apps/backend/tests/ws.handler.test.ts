@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import {afterEach, beforeEach, describe, expect, it} from "vitest";
 import { EventEmitter } from "events";
 import type { IncomingMessage } from "http";
 import type { WebSocketServer } from "ws";
@@ -38,20 +38,20 @@ class MockWebSocketServer extends EventEmitter {
 }
 
 class StrategyDetectorStub extends EventEmitter {
-  updateParams = jest.fn();
-  getParams = jest.fn().mockReturnValue(defaultStrategyParams);
-  getActiveSetups = jest.fn().mockReturnValue([]);
-  getSetupsForSymbol = jest.fn().mockReturnValue([]);
-  getStats = jest.fn();
-  start = jest.fn();
-  stop = jest.fn();
+  updateParams = vi.fn();
+  getParams = vi.fn().mockReturnValue(defaultStrategyParams);
+  getActiveSetups = vi.fn().mockReturnValue([]);
+  getSetupsForSymbol = vi.fn().mockReturnValue([]);
+  getStats = vi.fn();
+  start = vi.fn();
+  stop = vi.fn();
 }
 
 class MockStreamingService extends EventEmitter {
-  subscribe = jest.fn();
-  unsubscribe = jest.fn();
-  start = jest.fn();
-  stop = jest.fn();
+  subscribe = vi.fn();
+  unsubscribe = vi.fn();
+  start = vi.fn();
+  stop = vi.fn();
 }
 
 describe("setupWebSocketHandler", () => {
@@ -194,7 +194,7 @@ describe("setupWebSocketHandler", () => {
     failingService.start.mockImplementation(() => {
       throw new Error("offline");
     });
-    const logSpy = jest.spyOn(logger, "error").mockImplementation(() => undefined as never);
+    const logSpy = vi.spyOn(logger, "error").mockImplementation(() => undefined as never);
 
     setupWebSocketHandler(
       failingWss as unknown as WebSocketServer,
@@ -258,7 +258,7 @@ describe("setupWebSocketHandler", () => {
   });
 
   it("replays active setups when present", () => {
-    strategyDetector.getActiveSetups = jest.fn().mockReturnValueOnce([{ id: "setup-42", symbol: "QQQ" }]);
+    strategyDetector.getActiveSetups = vi.fn().mockReturnValueOnce([{ id: "setup-42", symbol: "QQQ" }]);
     const client = new MockWebSocket();
     wss.simulateConnection(client);
     const summaries = client.sentPayloads.filter((payload) => JSON.parse(payload).type === "SETUP_UPDATE");
@@ -278,7 +278,7 @@ describe("setupWebSocketHandler", () => {
   });
 
   it("warns when messages arrive after the client meta is gone", () => {
-    const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => undefined as never);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => undefined as never);
     const client = new MockWebSocket();
     wss.simulateConnection(client);
     client.close();

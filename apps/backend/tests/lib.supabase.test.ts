@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it, jest } from "@jest/globals";
+import {afterAll, describe, expect, it} from "vitest";
 
 describe("supabase library bootstrap", () => {
   const original = {

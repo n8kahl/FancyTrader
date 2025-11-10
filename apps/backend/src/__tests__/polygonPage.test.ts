@@ -2,7 +2,7 @@ import axios from "axios";
 import type { AxiosResponse } from "axios";
 import { followNextUrls, encodeCursor, decodeCursor } from "../utils/polygonPage.js";
 
-jest.mock("axios");
+vi.mock("axios");
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 type PageRecord = { n: number };

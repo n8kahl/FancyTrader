@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
+import {describe, expect, it, beforeEach, afterEach} from "vitest";
 import type { Express } from "express";
 import request from "supertest";
 
@@ -68,10 +68,10 @@ describe("/api/chart/annotations - service wiring", () => {
       const store: any[] = [];
       return {
         ...actual,
-        listAnnotations: jest.fn(async (owner: string) =>
+        listAnnotations: vi.fn(async (owner: string) =>
           store.filter((item) => item.owner === owner)
         ),
-        createAnnotation: jest.fn(async (owner: string, payload: any) => {
+        createAnnotation: vi.fn(async (owner: string, payload: any) => {
           const record = {
             id: `mock-${store.length}`,
             owner,
@@ -84,13 +84,13 @@ describe("/api/chart/annotations - service wiring", () => {
           store.unshift(record);
           return record;
         }),
-        updateAnnotation: jest.fn(async (owner: string, id: string, partial: any) => {
+        updateAnnotation: vi.fn(async (owner: string, id: string, partial: any) => {
           const idx = store.findIndex((item) => item.owner === owner && item.id === id);
           if (idx === -1) return null;
           store[idx] = { ...store[idx], ...partial };
           return store[idx];
         }),
-        deleteAnnotation: jest.fn(async (owner: string, id: string) => {
+        deleteAnnotation: vi.fn(async (owner: string, id: string) => {
           const before = store.length;
           const next = store.filter((item) => !(item.owner === owner && item.id === id));
           store.splice(0, store.length, ...next);

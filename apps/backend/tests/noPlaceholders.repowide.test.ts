@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, it, expect } from "@jest/globals";
+import {describe, it, expect} from "vitest";
 
 const IGNORE_DIRS = new Set([
   "node_modules",

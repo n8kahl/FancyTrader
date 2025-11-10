@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { defineConfig } from "vitest/dist/config.js";
 
 export default defineConfig({
   resolve: {
@@ -8,12 +8,11 @@ export default defineConfig({
     },
   },
   test: {
-    globals: true,
     environment: "node",
-    setupFiles: ["./tests/testSetup.ts"],
+    globals: true,
     coverage: {
       provider: "v8",
-      reportsDirectory: "./coverage",
     },
+    setupFiles: ["./tests/testSetup.ts"],
   },
 });

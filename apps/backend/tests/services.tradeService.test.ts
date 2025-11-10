@@ -1,6 +1,6 @@
 process.env.TRADES_MEMORY_STORE = "false";
 
-jest.mock("../src/lib/supabase", () => {
+vi.mock("../src/lib/supabase", () => {
   let rows: any[] = [];
 
   const matches = (row: any, filters: Record<string, any>) =>

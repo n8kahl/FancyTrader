@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import {afterEach, describe, expect, it} from "vitest";
 import { WebSocketServer } from "ws";
 import { MassiveStreamingService } from "../src/services/massiveStreamingService";
 
@@ -49,7 +49,7 @@ describe("MassiveStreamingService", () => {
       baseUrl: `ws://localhost:${port}`,
       apiKey: "test",
       subscriptions: ["T.AAPL"],
-      logger: jest.fn(),
+      logger: vi.fn(),
     });
     svc.on("error", () => undefined);
     svc.start();
@@ -80,7 +80,7 @@ describe("MassiveStreamingService", () => {
     const svc = new MassiveStreamingService({
       baseUrl: `ws://localhost:${port}`,
       apiKey: "demo",
-      logger: jest.fn(),
+      logger: vi.fn(),
     });
     svc.on("error", () => undefined);
 

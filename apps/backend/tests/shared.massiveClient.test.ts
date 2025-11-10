@@ -1,5 +1,5 @@
 import nock from "nock";
-import { describe, it, expect, beforeAll, afterAll, afterEach, jest } from "@jest/globals";
+import {describe, it, expect, beforeAll, afterAll, afterEach} from "vitest";
 import { MassiveClient, marketToMode } from "../../packages/shared/src/client/massive";
 
 describe("MassiveClient", () => {

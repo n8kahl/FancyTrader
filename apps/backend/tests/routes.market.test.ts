@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from "@jest/globals";
+import {afterAll, afterEach, beforeAll, describe, expect, it} from "vitest";
 import request from "supertest";
 import nock from "nock";
 import type { AppServices } from "../src/app";
@@ -13,33 +13,33 @@ import { PolygonClient } from "../src/services/polygonClient";
 
 const buildMockServices = (): AppServices => {
   const supabaseService = {
-    getWatchlist: jest.fn().mockResolvedValue([]),
-    saveWatchlist: jest.fn().mockResolvedValue(undefined),
-    saveSetup: jest.fn().mockResolvedValue(undefined),
-    getSetups: jest.fn().mockResolvedValue([]),
-    deleteSetup: jest.fn().mockResolvedValue(undefined),
+    getWatchlist: vi.fn().mockResolvedValue([]),
+    saveWatchlist: vi.fn().mockResolvedValue(undefined),
+    saveSetup: vi.fn().mockResolvedValue(undefined),
+    getSetups: vi.fn().mockResolvedValue([]),
+    deleteSetup: vi.fn().mockResolvedValue(undefined),
   } as unknown as SupabaseService;
 
   const supabaseSetups = {
-    listSetups: jest.fn().mockResolvedValue([]),
-    saveSetup: jest.fn().mockResolvedValue(undefined),
-    deleteSetup: jest.fn().mockResolvedValue(undefined),
+    listSetups: vi.fn().mockResolvedValue([]),
+    saveSetup: vi.fn().mockResolvedValue(undefined),
+    deleteSetup: vi.fn().mockResolvedValue(undefined),
   } as unknown as SupabaseSetupsService;
 
   const strategyDetector = {
-    updateParams: jest.fn(),
-    getParams: jest.fn().mockReturnValue(defaultStrategyParams),
-    getActiveSetups: jest.fn().mockReturnValue([]),
-    getSetupsForSymbol: jest.fn().mockReturnValue([]),
-    on: jest.fn(),
-    emit: jest.fn(),
+    updateParams: vi.fn(),
+    getParams: vi.fn().mockReturnValue(defaultStrategyParams),
+    getActiveSetups: vi.fn().mockReturnValue([]),
+    getSetupsForSymbol: vi.fn().mockReturnValue([]),
+    on: vi.fn(),
+    emit: vi.fn(),
   } as unknown as StrategyDetectorService;
 
   const polygonService = {
-    subscribe: jest.fn(),
-    unsubscribe: jest.fn(),
-    connect: jest.fn().mockResolvedValue(undefined),
-    disconnect: jest.fn().mockResolvedValue(undefined),
+    subscribe: vi.fn(),
+    unsubscribe: vi.fn(),
+    connect: vi.fn().mockResolvedValue(undefined),
+    disconnect: vi.fn().mockResolvedValue(undefined),
   } as unknown as PolygonStreamingService;
 
   return {

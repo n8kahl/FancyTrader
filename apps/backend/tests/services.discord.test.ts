@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "@jest/globals";
+import {afterAll, beforeAll, beforeEach, describe, expect, it} from "vitest";
 import nock from "nock";
 import request from "supertest";
 import type { Express } from "express";
