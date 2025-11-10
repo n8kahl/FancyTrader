@@ -65,23 +65,16 @@ async function insertScanRun(payload) {
     });
 }
 
-async function isMarketClosedNow(timezone = "America/New_York") {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-    weekday: "short",
-  }).formatToParts(now);
-  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
-  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
-  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "Mon";
-  if (weekday === "Sat" || weekday === "Sun") return true;
-  const totalMinutes = hour * 60 + minute;
-  if (totalMinutes < 9 * 60 + 30) return true;
-  if (totalMinutes >= 16 * 60) return true;
-  return false;
+function isNysRegularOpen(d = new Date()) {
+  const utc = new Date(d);
+  const day = utc.getUTCDay();
+  if (day === 0 || day === 6) {
+    return false;
+  }
+  const mins = utc.getUTCHours() * 60 + utc.getUTCMinutes();
+  const open = 13 * 60 + 30;
+  const close = 20 * 60;
+  return mins >= open && mins < close;
 }
 const WATCH_SYMBOLS = (process.env.WORKER_SYMBOLS ?? "SPY,QQQ")
   .split(",")
@@ -89,8 +82,31 @@ const WATCH_SYMBOLS = (process.env.WORKER_SYMBOLS ?? "SPY,QQQ")
   .filter(Boolean);
 
 const runOnce = async (ctx = {}) => {
-  const session = normalizeSession(ctx.session ?? process.env.WORKER_FORCE_SESSION);
-  const noop = normalizeNoop(ctx.noop ?? process.env.WORKER_NOOP);
+  let session = normalizeSession(ctx.session ?? process.env.WORKER_FORCE_SESSION);
+  let noop = normalizeNoop(ctx.noop ?? process.env.WORKER_NOOP);
+  let reason = ctx.reason ?? "auto";
+
+  if (session === "open" && !isNysRegularOpen(new Date())) {
+    noop = true;
+    reason = "market-closed";
+    log.info("[diag] auto-noop (market closed)", { session, reason });
+    const labelSet = { session: "open", noop: "true", result: "success" };
+    scanRunsTotal.labels(labelSet).inc();
+    scanLatencyMs.labels(labelSet).observe(0);
+    await insertScanRun({
+      inserted_at: new Date().toISOString(),
+      window_start: new Date().toISOString(),
+      status: "success",
+      session: "open",
+      noop: true,
+      snapshot_backed: false,
+      snapshot_count: 0,
+      duration_ms: 0,
+      meta: { reason, worker: "apps/worker" },
+    });
+    return;
+  }
+
   const runCtx = { ...ctx, session, noop };
   runCtx.forceSession = session;
 
@@ -139,39 +155,18 @@ const runOnce = async (ctx = {}) => {
         if (ts >= cutoff) {
           diag.fresh.push(sym);
         } else {
-        diag.stale.push({ symbol: sym, age_min: Math.round((Date.now() - ts) / 60000) });
+          diag.stale.push({ symbol: sym, age_min: Math.round((Date.now() - ts) / 60000) });
+        }
       }
     }
-  }
-  if (session === "open" && (await isMarketClosedNow())) {
-    const reason = "market-closed";
-    log.info("[diag] auto-noop (market closed)", { session, reason });
-    const labelSet = { session: "open", noop: "true", result: "success" };
-    scanRunsTotal.labels(labelSet).inc();
-    scanLatencyMs.labels(labelSet).observe(0);
-    const meta = { reason, worker: "apps/worker" };
-    await insertScanRun({
-      inserted_at: new Date().toISOString(),
-      window_start: new Date().toISOString(),
-      status: "success",
-      session: "open",
-      noop: true,
-      snapshot_backed: false,
-      snapshot_count: 0,
-      duration_ms: 0,
-      meta,
-    });
-    return;
-  }
   }
   const start = Date.now();
   const autoNoop =
     session === "closed" && ((diag.stale?.length || 0) > 0 || (diag.missing?.length || 0) > 0);
-  const effectiveNoop = Boolean(ctx.noop) || autoNoop;
+  const effectiveNoop = Boolean(noop) || autoNoop;
   jobsInflight.inc();
   let resultLabel = "success";
   let durationMs = null;
-  const reason = ctx.reason ?? "auto";
   const baseMeta = ctx.meta ?? { reason, worker: "apps/worker" };
   const metaPayload = {
     ...baseMeta,
