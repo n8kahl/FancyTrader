@@ -42,7 +42,9 @@ function normalizeNoop(raw) {
   return v === "1" || v === "true";
 }
 
-const log = (...a) => console.log(...a);
+const log = Object.assign((...a) => console.log(...a), {
+  info: (...a) => console.info(...a),
+});
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseSvc = process.env.SUPABASE_SERVICE_KEY;
@@ -50,6 +52,37 @@ const sb =
   supabaseUrl && supabaseSvc
     ? createClient(supabaseUrl, supabaseSvc, { auth: { persistSession: false } })
     : null;
+
+async function insertScanRun(payload) {
+  if (!sb) return;
+  await sb
+    .from("scan_runs")
+    .insert(payload)
+    .then(({ error }) => {
+      if (error) {
+        console.error("[scan_runs insert error]", error);
+      }
+    });
+}
+
+async function isMarketClosedNow(timezone = "America/New_York") {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    weekday: "short",
+  }).formatToParts(now);
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "Mon";
+  if (weekday === "Sat" || weekday === "Sun") return true;
+  const totalMinutes = hour * 60 + minute;
+  if (totalMinutes < 9 * 60 + 30) return true;
+  if (totalMinutes >= 16 * 60) return true;
+  return false;
+}
 const WATCH_SYMBOLS = (process.env.WORKER_SYMBOLS ?? "SPY,QQQ")
   .split(",")
   .map((symbol) => symbol.trim().toUpperCase())
@@ -106,10 +139,30 @@ const runOnce = async (ctx = {}) => {
         if (ts >= cutoff) {
           diag.fresh.push(sym);
         } else {
-          diag.stale.push({ symbol: sym, age_min: Math.round((Date.now() - ts) / 60000) });
-        }
+        diag.stale.push({ symbol: sym, age_min: Math.round((Date.now() - ts) / 60000) });
       }
     }
+  }
+  if (session === "open" && (await isMarketClosedNow())) {
+    const reason = "market-closed";
+    log.info("[diag] auto-noop (market closed)", { session, reason });
+    const labelSet = { session: "open", noop: "true", result: "success" };
+    scanRunsTotal.labels(labelSet).inc();
+    scanLatencyMs.labels(labelSet).observe(0);
+    const meta = { reason, worker: "apps/worker" };
+    await insertScanRun({
+      inserted_at: new Date().toISOString(),
+      window_start: new Date().toISOString(),
+      status: "success",
+      session: "open",
+      noop: true,
+      snapshot_backed: false,
+      snapshot_count: 0,
+      duration_ms: 0,
+      meta,
+    });
+    return;
+  }
   }
   const start = Date.now();
   const autoNoop =
