@@ -1,5 +1,6 @@
 import express from "express";
 import * as promClient from "prom-client";
+import { createClient } from "@supabase/supabase-js";
 import { main as triggerRun } from "./dist/index.js";
 
 promClient.collectDefaultMetrics();
@@ -47,6 +48,13 @@ function labels(opts = {}) {
 
 const log = (...a) => console.log(...a);
 
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseSvc = process.env.SUPABASE_SERVICE_KEY;
+const sb =
+  supabaseUrl && supabaseSvc
+    ? createClient(supabaseUrl, supabaseSvc, { auth: { persistSession: false } })
+    : null;
+
 const runOnce = async (ctx = {}) => {
   const { session, noop } = labels(ctx);
   const runCtx = { ...ctx };
@@ -57,18 +65,46 @@ const runOnce = async (ctx = {}) => {
   const start = Date.now();
   jobsInflight.inc();
   let resultLabel = "success";
+  let info = null;
+  let durationMs = null;
   try {
-    await triggerRun(runCtx);
+    info = await triggerRun(runCtx);
     scanSuccess.inc();
     scanRunsTotal.labels(session, noop, "success").inc();
     log("[diag] main() returned", { session, noop, reason: ctx.reason });
+    durationMs = Date.now() - start;
+    if (sb) {
+      const nowIso = new Date().toISOString();
+      const payload = {
+        inserted_at: nowIso,
+        window_start: nowIso,
+        status: "success",
+        session: String(info?.session ?? "unknown"),
+        noop: String(info?.noop ?? "false") === "true",
+        snapshot_backed: Boolean(info?.snapshot_backed ?? (info?.session === "closed")),
+        snapshot_count: Number.isFinite(info?.snapshot_count) ? info.snapshot_count : 0,
+        duration_ms: durationMs,
+        meta: info ?? null,
+      };
+      sb
+        .from("scan_runs")
+        .insert(payload)
+        .then(({ error }) => {
+          if (error) {
+            console.error("[scan_runs insert error]", error);
+          }
+        });
+    }
   } catch (e) {
     resultLabel = "failure";
+    durationMs = Date.now() - start;
     scanFailure.inc();
     scanRunsTotal.labels(session, noop, "failure").inc();
     console.error("[metrics] run failed", e);
   } finally {
-    const durationMs = Date.now() - start;
+    if (durationMs === null) {
+      durationMs = Date.now() - start;
+    }
     scanLatencyMs.labels(session, noop, resultLabel).observe(durationMs);
     jobsInflight.dec();
   }
