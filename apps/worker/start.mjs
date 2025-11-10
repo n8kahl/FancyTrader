@@ -67,7 +67,7 @@ const runOnce = async (ctx = {}) => {
   const cutoff = Date.now() - FRESH_MINUTES * 60_000;
   const diag = {
     expected: WATCH_SYMBOLS.length,
-    got: snapshot_count,
+    got: 0,
     fresh: [],
     stale: [],
     missing: [],
@@ -112,20 +112,28 @@ const runOnce = async (ctx = {}) => {
     }
   }
   const start = Date.now();
+  const autoNoop =
+    session === "closed" && ((diag.stale?.length || 0) > 0 || (diag.missing?.length || 0) > 0);
+  const effectiveNoop = Boolean(ctx.noop) || autoNoop;
   jobsInflight.inc();
   let resultLabel = "success";
-  let info = null;
   let durationMs = null;
   const reason = ctx.reason ?? "auto";
   const baseMeta = ctx.meta ?? { reason, worker: "apps/worker" };
-  const metaPayload =
-    session === "closed" ? { ...baseMeta, snapshots: diag } : baseMeta;
+  const metaPayload = {
+    ...baseMeta,
+    ...(session === "closed" ? { snapshots: diag } : {}),
+    ...(autoNoop ? { reason: "stale-snapshots", worker: "apps/worker" } : {}),
+  };
+  const shouldRun = !effectiveNoop;
   try {
-    info = await triggerRun(runCtx);
-    scanSuccess.inc();
-    const noopLabel = String(noop);
-    scanRunsTotal.labels(session, noopLabel, "success").inc();
-    log("[diag] main() returned", { session, noop, reason });
+    if (shouldRun) {
+      await triggerRun(runCtx);
+      scanSuccess.inc();
+      log("[diag] main() returned", { session, noop, reason });
+    } else {
+      log("[diag] run skipped (auto noop)", { session, noop, reason: metaPayload.reason });
+    }
     durationMs = Math.max(0, Math.round(Date.now() - start));
     if (sb) {
       const nowIso = new Date().toISOString();
@@ -135,7 +143,7 @@ const runOnce = async (ctx = {}) => {
         window_start: nowIso,
         status: "success",
         session,
-        noop,
+        noop: effectiveNoop,
         snapshot_backed,
         snapshot_count,
         duration_ms: durationMs,
@@ -154,14 +162,14 @@ const runOnce = async (ctx = {}) => {
     resultLabel = "failure";
     durationMs = Math.max(0, Math.round(Date.now() - start));
     scanFailure.inc();
-    const noopLabel = String(noop);
-    scanRunsTotal.labels(session, noopLabel, "failure").inc();
     console.error("[metrics] run failed", e);
   } finally {
     if (durationMs === null) {
       durationMs = Math.max(0, Math.round(Date.now() - start));
     }
-    scanLatencyMs.labels(session, String(noop), resultLabel).observe(durationMs);
+    const metricLabels = { session, noop: String(effectiveNoop), result: resultLabel };
+    scanRunsTotal.labels(metricLabels).inc();
+    scanLatencyMs.labels(metricLabels).observe(durationMs);
     jobsInflight.dec();
   }
 };
