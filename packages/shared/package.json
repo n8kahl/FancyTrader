@@ -6,11 +6,12 @@
   "files": [
     "dist"
   ],
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --dts --format cjs,esm",
+    "build": "tsup src/index.ts --dts --format esm,cjs",
+    "dev": "tsup src/index.ts --dts --format esm,cjs --watch --sourcemap",
     "clean": "rimraf dist"
   },
   "dependencies": {
@@ -19,7 +20,7 @@
   },
   "devDependencies": {
     "rimraf": "5.0.5",
-    "tsup": "^8.0.1",
+    "tsup": "^8.5.0",
     "typescript": "5.6.3"
   },
   "exports": {

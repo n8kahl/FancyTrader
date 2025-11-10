@@ -17,7 +17,9 @@ import { AlertRegistry } from "./alerts/registry.js";
 import { defaultStrategyParams } from "./config/strategy.defaults.js";
 import { errorHandler } from "./middleware/error.js";
 import { alertLimiter, shareLimiter } from "./middleware/rateLimit.js";
+import pino from "pino";
 
+const log = pino({ name: "app" });
 const defaultAllowedOrigins = ["https://fancy-trader.vercel.app", "http://localhost:5173"];
 const corsAllowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 const corsAllowedHeaders = [
@@ -234,6 +236,27 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
       massiveStream.start();
       massiveStreamStarted = true;
     }
+  }
+
+
+  const STREAMING_ENABLED = process.env.STREAMING_ENABLED
+    ? process.env.STREAMING_ENABLED === "true"
+    : true;
+  const POLY_ON = process.env.FEATURE_POLYGON_ENABLED
+    ? process.env.FEATURE_POLYGON_ENABLED === "true"
+    : true;
+  if (STREAMING_ENABLED && POLY_ON) {
+    if (!process.env.POLYGON_API_KEY) {
+      throw new Error("POLYGON_API_KEY required when streaming is enabled");
+    }
+    polygonService
+      .connect()
+      .then(() => log.info("Polygon streaming started"))
+      .catch((error) => {
+        log.error({ error }, "Polygon streaming failed to start");
+      });
+  } else {
+    log.info({ STREAMING_ENABLED, POLY_ON }, "Polygon streaming disabled");
   }
 
 

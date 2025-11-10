@@ -1,3 +1,4 @@
+import pino from "pino";
 import { Express } from "express";
 import { MassiveClient, marketToMode } from "@fancytrader/shared";
 import { asyncHandler } from "../utils/asyncHandler.js";
@@ -7,6 +8,11 @@ const massive = new MassiveClient({
   apiKey: process.env.MASSIVE_API_KEY ?? "",
   baseUrl: process.env.MASSIVE_BASE_URL,
 });
+const log = pino({ name: "market-status" });
+const USE_MOCK = process.env.FEATURE_MOCK_MODE === "true";
+const FORCE_FALLBACK = process.env.FORCE_STATUS_FALLBACK === "true";
+
+type MarketSession = "premarket" | "regular" | "aftermarket" | "closed";
 
 function normalizeMarketSession(raw: any) {
   const session = marketToMode(raw);
@@ -20,6 +26,13 @@ function normalizeMarketSession(raw: any) {
   };
 }
 
+const fallbackStatus = () => ({
+  session: "premarket" as MarketSession,
+  nextOpen: null,
+  nextClose: null,
+  source: "fallback",
+  raw: null,
+});
 
 export function setupMarketDataRoutes(app: Express): void {
   app.get(
@@ -62,13 +75,22 @@ export function setupMarketDataRoutes(app: Express): void {
   app.get(
     "/api/market/status",
     asyncHandler(async (_req, res) => {
+      if (USE_MOCK || FORCE_FALLBACK) {
+        return res.status(200).json(fallbackStatus());
+      }
       try {
         const status = await massive.getMarketStatus();
         res.json(normalizeMarketSession(status));
-      } catch (error) {
-        res
-          .status(503)
-          .json({ error: "Massive error", detail: (error as Error).message ?? String(error) });
+      } catch (error: any) {
+        log.warn(
+          {
+            code: error?.response?.status,
+            url: error?.config?.url,
+            data: error?.response?.data,
+          },
+          "Massive status failed; serving fallback"
+        );
+        return res.status(200).json(fallbackStatus());
       }
     })
   );

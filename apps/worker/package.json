@@ -6,6 +6,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsup src/index.ts --dts --format esm,cjs",
+    "dev": "tsx src/index.ts",
     "start:loop": "node start.mjs"
   },
   "dependencies": {

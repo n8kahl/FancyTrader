@@ -25,3 +25,4 @@ apps/*/build/
 .idea/
 .env
 .env.*
+.env*

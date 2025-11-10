@@ -166,8 +166,12 @@ export type TradeStatus = z.infer<typeof tradeStatusSchema>;
 export type SetupType = z.infer<typeof setupTypeSchema>;
 export type AlertCondition = z.infer<typeof alertConditionSchema>;
 
+const upstreamProviderSchema = z.enum(["polygon", "massive"]);
+
+export type UpstreamProvider = z.infer<typeof upstreamProviderSchema>;
+
 export const serviceStateSchema = z.object({
-  source: z.literal("polygon"),
+  source: upstreamProviderSchema,
   status: z.enum(["initializing", "healthy", "degraded", "offline"]),
   reason: z.string().optional(),
   timestamp: z.number(),

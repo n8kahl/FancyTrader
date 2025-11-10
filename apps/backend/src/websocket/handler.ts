@@ -3,7 +3,7 @@ import type { IncomingMessage } from "http";
 import type { RawData, WebSocket } from "ws";
 import type { ServerOutbound } from "@fancytrader/shared";
 import { z } from "zod";
-import { DetectedSetup, WSMessage } from "../types/index.js";
+import { DetectedSetup, UpstreamProvider, WSMessage } from "../types/index.js";
 import { MassiveStreamingService } from "../services/massiveStreamingService.js";
 import { StrategyDetectorService } from "../services/strategyDetector.js";
 import { logger } from "../utils/logger.js";
@@ -74,11 +74,13 @@ export function setupWebSocketHandler(
     wss.clients.forEach((client) => client.readyState === 1 && client.send(JSON.stringify(msg)));
   });
 
+  const upstreamProvider: UpstreamProvider = "massive";
+
   streamingService.on("open", () => {
     broadcastToAll(wss, {
       type: "SERVICE_STATE",
       payload: {
-        source: "massive",
+        source: upstreamProvider,
         status: "healthy",
         timestamp: Date.now(),
       },
@@ -90,7 +92,7 @@ export function setupWebSocketHandler(
     broadcastToAll(wss, {
       type: "SERVICE_STATE",
       payload: {
-        source: "massive",
+        source: upstreamProvider,
         status: "offline",
         timestamp: Date.now(),
       },
@@ -193,12 +195,12 @@ export function setupWebSocketHandler(
     });
 
     sendMessage(ws, {
-      type: "SERVICE_STATE",
-      payload: {
-        source: "massive",
-        status: "healthy",
-        timestamp: Date.now(),
-      },
+          type: "SERVICE_STATE",
+          payload: {
+            source: upstreamProvider,
+            status: "healthy",
+            timestamp: Date.now(),
+          },
       timestamp: Date.now(),
     });
 

@@ -175,3 +175,5 @@ export interface StrategyConfig {
   timeframes: string[];
   minConfluence: number;
 }
+
+export type UpstreamProvider = "polygon" | "massive";
