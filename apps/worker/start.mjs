@@ -67,12 +67,13 @@ const runOnce = async (ctx = {}) => {
   let resultLabel = "success";
   let info = null;
   let durationMs = null;
+  const reason = ctx.reason ?? "auto";
   try {
     info = await triggerRun(runCtx);
     scanSuccess.inc();
     scanRunsTotal.labels(session, noop, "success").inc();
-    log("[diag] main() returned", { session, noop, reason: ctx.reason });
-    durationMs = Date.now() - start;
+    log("[diag] main() returned", { session, noop, reason });
+    durationMs = Math.max(0, Math.round(Date.now() - start));
     if (sb) {
       const nowIso = new Date().toISOString();
       const payload = {
@@ -81,12 +82,15 @@ const runOnce = async (ctx = {}) => {
         status: "success",
         session: String(info?.session ?? "unknown"),
         noop: String(info?.noop ?? "false") === "true",
-        snapshot_backed: Boolean(info?.snapshot_backed ?? (info?.session === "closed")),
+        snapshot_backed: Boolean(info?.snapshot_backed ?? false),
         snapshot_count: Number.isFinite(info?.snapshot_count) ? info.snapshot_count : 0,
         duration_ms: durationMs,
-        meta: info ?? null,
+        meta: {
+          reason: info?.reason ?? reason ?? "auto",
+          worker: "apps/worker",
+        },
       };
-      sb
+      await sb
         .from("scan_runs")
         .insert(payload)
         .then(({ error }) => {
@@ -97,13 +101,13 @@ const runOnce = async (ctx = {}) => {
     }
   } catch (e) {
     resultLabel = "failure";
-    durationMs = Date.now() - start;
+    durationMs = Math.max(0, Math.round(Date.now() - start));
     scanFailure.inc();
     scanRunsTotal.labels(session, noop, "failure").inc();
     console.error("[metrics] run failed", e);
   } finally {
     if (durationMs === null) {
-      durationMs = Date.now() - start;
+      durationMs = Math.max(0, Math.round(Date.now() - start));
     }
     scanLatencyMs.labels(session, noop, resultLabel).observe(durationMs);
     jobsInflight.dec();
