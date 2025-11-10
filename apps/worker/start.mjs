@@ -90,9 +90,8 @@ const runOnce = async (ctx = {}) => {
     noop = true;
     reason = "market-closed";
     log.info("[diag] auto-noop (market closed)", { session, reason });
-    const labelSet = { session: "open", noop: "true", result: "success" };
-    scanRunsTotal.labels(labelSet).inc();
-    scanLatencyMs.labels(labelSet).observe(0);
+    scanRunsTotal.labels("open", "true", "success").inc();
+    scanLatencyMs.labels("open", "true", "success").observe(0);
     await insertScanRun({
       inserted_at: new Date().toISOString(),
       window_start: new Date().toISOString(),
@@ -215,9 +214,8 @@ const runOnce = async (ctx = {}) => {
     if (durationMs === null) {
       durationMs = Math.max(0, Math.round(Date.now() - start));
     }
-    const metricLabels = { session, noop: String(effectiveNoop), result: resultLabel };
-    scanRunsTotal.labels(metricLabels).inc();
-    scanLatencyMs.labels(metricLabels).observe(durationMs);
+    scanRunsTotal.labels(session, String(effectiveNoop), resultLabel).inc();
+    scanLatencyMs.labels(session, String(effectiveNoop), resultLabel).observe(durationMs);
     jobsInflight.dec();
   }
 };

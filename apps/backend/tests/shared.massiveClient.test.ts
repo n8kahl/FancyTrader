@@ -1,40 +1,61 @@
 import nock from "nock";
-import { describe, it, expect, beforeAll, afterAll, afterEach } from "@jest/globals";
+import { describe, it, expect, beforeAll, afterAll, afterEach, jest } from "@jest/globals";
 import { MassiveClient, marketToMode } from "../../packages/shared/src/client/massive";
 
-describe("MassiveClient basic smoke", () => {
+describe("MassiveClient", () => {
   const base = "https://api.massive.com";
-  const client = new MassiveClient({ baseUrl: base, apiKey: "test_key" });
+  const createClient = (opts = {}) => new MassiveClient({ baseUrl: base, apiKey: "test_key", ...opts });
 
   beforeAll(() => {
     nock.disableNetConnect();
     nock.enableNetConnect("127.0.0.1");
   });
 
-  afterEach(() => nock.cleanAll());
-  afterAll(() => nock.enableNetConnect());
+  afterEach(() => {
+    nock.cleanAll();
+    jest.useRealTimers();
+  });
 
-  it("fetches market status and maps session", async () => {
-    nock(base)
-      .get("/v1/marketstatus/now")
-      .query({ apiKey: "test_key" })
-      .reply(200, { market: "open" });
+  afterAll(() => {
+    nock.enableNetConnect();
+  });
 
-    const status = await client.getMarketStatus();
+  it("maps open → regular", async () => {
+    nock(base).get("/v3/market/status").reply(200, { market: "open" });
+    const status = await createClient().getMarketStatus();
     expect(marketToMode(status)).toBe("regular");
   });
 
-  it("retries on 429", async () => {
+  it("retries on 429 honoring Retry-After", async () => {
     const scope = nock(base)
-      .get("/v1/marketstatus/now")
-      .query(true)
-      .reply(429, {}, { "Retry-After": "1" })
-      .get("/v1/marketstatus/now")
-      .query(true)
+      .get("/v3/market/status")
+      .reply(429, {}, { "retry-after": "1" })
+      .get("/v3/market/status")
       .reply(200, { market: "closed" });
 
-    const status = await client.getMarketStatus();
+    const status = await createClient().getMarketStatus();
     expect(marketToMode(status)).toBe("closed");
     expect(scope.isDone()).toBe(true);
+  });
+
+  it("opens circuit after repeated failures and recovers", async () => {
+    jest.useFakeTimers();
+    const client = createClient({ maxRetries: 0 });
+    const failureScope = nock(base);
+    for (let i = 0; i < 5; i += 1) {
+      failureScope.get("/v3/market/status").reply(500);
+    }
+
+    for (let i = 0; i < 5; i += 1) {
+      await expect(client.getMarketStatus()).rejects.toThrow();
+    }
+
+    await expect(client.getMarketStatus()).rejects.toThrow("CircuitOpen");
+
+    jest.advanceTimersByTime(30_001);
+    nock(base).get("/v3/market/status").reply(200, { market: "regular" });
+
+    const status = await client.getMarketStatus();
+    expect(marketToMode(status)).toBe("regular");
   });
 });

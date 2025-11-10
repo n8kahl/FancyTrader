@@ -78,7 +78,7 @@ export function setupWebSocketHandler(
     broadcastToAll(wss, {
       type: "SERVICE_STATE",
       payload: {
-        source: "polygon",
+        source: "massive",
         status: "healthy",
         timestamp: Date.now(),
       },
@@ -90,7 +90,7 @@ export function setupWebSocketHandler(
     broadcastToAll(wss, {
       type: "SERVICE_STATE",
       payload: {
-        source: "polygon",
+        source: "massive",
         status: "offline",
         timestamp: Date.now(),
       },
@@ -195,7 +195,7 @@ export function setupWebSocketHandler(
     sendMessage(ws, {
       type: "SERVICE_STATE",
       payload: {
-        source: "polygon",
+        source: "massive",
         status: "healthy",
         timestamp: Date.now(),
       },
