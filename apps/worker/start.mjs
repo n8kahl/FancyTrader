@@ -29,28 +29,17 @@ const scanLatencyMs = new promClient.Histogram({
   labelNames: ["session", "noop", "result"],
 });
 
-function normalizeSession(input) {
-  return String(input).toLowerCase() === "open" ? "open" : "closed";
+function normalizeSession(raw) {
+  const v = String(raw ?? "").toLowerCase();
+  return v === "open" || v === "closed" ? v : "unknown";
 }
 
-function normalizeNoop(input) {
-  if (typeof input === "string") {
-    return input.toLowerCase() === "true";
+function normalizeNoop(raw) {
+  if (raw === true || raw === false) {
+    return raw;
   }
-  return Boolean(input);
-}
-
-function buildRunParams(partial = {}) {
-  const rawSession =
-    partial.session ??
-    process.env.WORKER_FORCE_SESSION ??
-    "closed";
-  const rawNoop = partial.noop ?? process.env.WORKER_NOOP ?? false;
-  return {
-    ...partial,
-    session: normalizeSession(rawSession),
-    noop: normalizeNoop(rawNoop),
-  };
+  const v = String(raw ?? "").toLowerCase();
+  return v === "1" || v === "true";
 }
 
 const log = (...a) => console.log(...a);
@@ -63,8 +52,8 @@ const sb =
     : null;
 
 const runOnce = async (ctx = {}) => {
-  const session = ctx.session ?? normalizeSession("closed");
-  const noop = ctx.noop ?? normalizeNoop(false);
+  const session = normalizeSession(ctx.session ?? process.env.WORKER_FORCE_SESSION);
+  const noop = normalizeNoop(ctx.noop ?? process.env.WORKER_NOOP);
   const runCtx = { ...ctx, session, noop };
   runCtx.forceSession = session;
 
@@ -74,6 +63,7 @@ const runOnce = async (ctx = {}) => {
   let info = null;
   let durationMs = null;
   const reason = ctx.reason ?? "auto";
+  const metaPayload = ctx.meta ?? { reason, worker: "apps/worker" };
   try {
     info = await triggerRun(runCtx);
     scanSuccess.inc();
@@ -83,18 +73,13 @@ const runOnce = async (ctx = {}) => {
     durationMs = Math.max(0, Math.round(Date.now() - start));
     if (sb) {
       const nowIso = new Date().toISOString();
-      const metaPayload =
-        info?.meta ?? {
-          reason: info?.reason ?? reason ?? "auto",
-          worker: "apps/worker",
-        };
 
       const payload = {
         inserted_at: nowIso,
         window_start: nowIso,
         status: "success",
-        session: String(info?.session ?? "unknown"),
-        noop: String(info?.noop ?? "false") === "true",
+        session,
+        noop,
         snapshot_backed: Boolean(info?.snapshot_backed ?? false),
         snapshot_count: Number.isFinite(info?.snapshot_count) ? info.snapshot_count : 0,
         duration_ms: durationMs,
@@ -141,21 +126,16 @@ app.get("/metrics", async (_req, res) => {
 });
 
 app.post("/run-now", (req, res) => {
-  const rawSession =
-    (req.query.session && String(req.query.session)) ||
-    process.env.WORKER_FORCE_SESSION ||
-    "closed";
-  const rawNoop = req.query.noop ?? process.env.WORKER_NOOP ?? "false";
-  const session = normalizeSession(rawSession);
-  const noop = normalizeNoop(rawNoop);
+  const session = normalizeSession(req.query.session);
+  const noop = normalizeNoop(req.query.noop);
+  const meta = { reason: "manual", worker: "apps/worker" };
 
   console.log("[run-now] received", { session, noop });
 
   res.json({ ok: true, accepted: true, session, noop, ts: new Date().toISOString() });
 
-  const runParams = buildRunParams({ session, noop, reason: "manual" });
   queueMicrotask(() => {
-    runOnce(runParams)
+    runOnce({ session, noop, meta })
       .then(() => console.log("[run-now] completed", { session, noop }))
       .catch((e) => console.error("[run-now] error", e));
   });
@@ -164,13 +144,15 @@ app.post("/run-now", (req, res) => {
 const EVERY = Number(process.env.WORKER_EVERY_MS) || 60000;
 const PORT = Number(process.env.PORT) || 8080;
 
-const scheduledRun = () => {
-  const params = buildRunParams({ reason: "scheduled" });
-  void runOnce(params);
+const tick = () => {
+  const session = normalizeSession(process.env.WORKER_FORCE_SESSION);
+  const noop = normalizeNoop(process.env.WORKER_NOOP);
+  const meta = { reason: "scheduled", worker: "apps/worker" };
+  void runOnce({ session, noop, meta });
 };
 
-void scheduledRun();
-setInterval(scheduledRun, EVERY);
+void tick();
+setInterval(tick, EVERY);
 
 app.listen(PORT, "0.0.0.0", () => {
   log("[diag] web listening", { PORT });
