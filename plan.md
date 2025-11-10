@@ -1,4 +1,6 @@
-# Plan Overview
+# (Legacy) Plan Overview — Archived
+This file has been superseded by **`docs/AUTHORITATIVE_PLAN.md`**.
+Future updates should only change that document.
 
 ## Goals
 

@@ -1,6 +1,9 @@
-{
+> ⚠️ **Deprecated (Superseded by `docs/AUTHORITATIVE_PLAN.md`)**
+>
+> This file is preserved for context only. The canonical roadmap lives in:
+> **`docs/AUTHORITATIVE_PLAN.md`**.
 
-## Sprint Plan (4–5 sprints)
+## (Legacy) Sprint Plan (archived)
 
 **Sprint 1 — Workspace alignment & build determinism**
 Goal: Clean separation frontend/backend, single source of truth for configs, pinned deps, environment validation.
