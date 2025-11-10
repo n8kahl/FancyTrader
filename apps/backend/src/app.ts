@@ -11,8 +11,6 @@ import { logger } from "./utils/logger.js";
 import { SupabaseService } from "./services/supabaseService.js";
 import { SupabaseSetupsService } from "./services/supabaseSetups.js";
 import { StrategyDetectorService } from "./services/strategyDetector.js";
-import { PolygonStreamingService } from "./services/polygonStreamingService.js";
-import { MassiveStreamingService } from "./services/massiveStreamingService.js";
 import { AlertRegistry } from "./alerts/registry.js";
 import { defaultStrategyParams } from "./config/strategy.defaults.js";
 import { errorHandler } from "./middleware/error.js";
@@ -102,7 +100,6 @@ export interface AppServices {
   supabaseService: SupabaseService;
   supabaseSetups: SupabaseSetupsService;
   strategyDetector: StrategyDetectorService;
-  polygonService: PolygonStreamingService;
   alertRegistry: AlertRegistry;
 }
 
@@ -110,9 +107,12 @@ export interface CreateAppOptions {
   services?: Partial<AppServices>;
 }
 
+export type Streamer = { start: () => Promise<void>; stop: () => Promise<void> } | null;
+
 export interface CreateAppResult {
   app: express.Express;
   services: AppServices;
+  streaming: Streamer;
 }
 
 export async function createApp(options: CreateAppOptions = {}): Promise<CreateAppResult> {
@@ -120,8 +120,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
 
   const strategyDetector =
     options.services?.strategyDetector ?? new StrategyDetectorService(defaultStrategyParams);
-  const polygonService =
-    options.services?.polygonService ?? new PolygonStreamingService(strategyDetector);
   const supabaseService = options.services?.supabaseService ?? new SupabaseService();
   const supabaseSetups = options.services?.supabaseSetups ?? new SupabaseSetupsService();
   const alertRegistry = options.services?.alertRegistry ?? new AlertRegistry();
@@ -130,7 +128,6 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
     supabaseService,
     supabaseSetups,
     strategyDetector,
-    polygonService,
     alertRegistry,
   };
 
@@ -214,16 +211,13 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
 
   app.use(errorHandler);
 
+  const STREAMING_ENABLED = process.env.STREAMING_ENABLED === "true";
   const ENABLE_POLYGON = process.env.FEATURE_ENABLE_POLYGON_STREAM === "true";
   const ENABLE_MASSIVE = process.env.FEATURE_ENABLE_MASSIVE_STREAM === "true";
-  const STREAMING_ENABLED = process.env.STREAMING_ENABLED === "true";
 
-  log.info(
-    { STREAMING_ENABLED, ENABLE_POLYGON, ENABLE_MASSIVE },
-    "Streaming feature flags"
-  );
+  log.info({ STREAMING_ENABLED, ENABLE_POLYGON, ENABLE_MASSIVE }, "Streaming flags");
 
-  let streaming: { start: () => Promise<void>; stop?: () => Promise<void> } | null = null;
+  let streaming: Streamer = null;
 
   if (STREAMING_ENABLED) {
     if (ENABLE_POLYGON) {
@@ -231,7 +225,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
       if (!key) {
         throw new Error("POLYGON_API_KEY required when FEATURE_ENABLE_POLYGON_STREAM=true");
       }
-      await import("./services/polygonStreamingService.js"); // ensure module is loaded when needed
+      const { PolygonStreamingService } = await import("./services/polygonStreamingService.js");
+      const polygonService = new PolygonStreamingService(strategyDetector);
       streaming = {
         start: () => polygonService.connect(),
         stop: () => polygonService.disconnect(),
@@ -242,6 +237,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
       if (!key) {
         throw new Error("MASSIVE_API_KEY required when FEATURE_ENABLE_MASSIVE_STREAM=true");
       }
+      const { MassiveStreamingService } = await import("./services/massiveStreamingService.js");
       const massive = new MassiveStreamingService({
         baseUrl: process.env.MASSIVE_WS_BASE || "wss://socket.massive.com",
         cluster: process.env.MASSIVE_WS_CLUSTER || "options",
@@ -261,18 +257,12 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
       };
       log.info("Massive streaming enabled");
     } else {
-      log.warn("STREAMING_ENABLED=true but no provider flag is set; streaming skipped");
+      log.warn(
+        "STREAMING_ENABLED=true but no provider flag is set; skipping streamer construction"
+      );
     }
   } else {
-    log.warn("All streaming disabled by STREAMING_ENABLED flag");
-  }
-
-  if (streaming) {
-    try {
-      await streaming.start();
-    } catch (error) {
-      log.error({ error }, "Streaming failed to start");
-    }
+    log.warn("Streaming disabled via STREAMING_ENABLED");
   }
 
   return { app, services };

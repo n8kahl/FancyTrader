@@ -28,7 +28,7 @@ const boolFromEnv = (value: string | undefined, fallback: boolean): boolean => {
 
 const streamingEnabled = boolFromEnv(process.env.STREAMING_ENABLED, true);
 
-const { app, services } = await createApp();
+const { app, services, streaming } = await createApp();
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 globalThis.__WSS_READY__ = false;
@@ -69,6 +69,9 @@ server.listen(PORT, () => {
   logger.info(`🚀 Fancy Trader Backend running on port ${PORT}`);
   logger.info(`WebSocket available at ws://localhost:${PORT}/ws`);
   logger.info(`Environment: ${process.env.NODE_ENV}`);
+  if (streaming) {
+    void streaming.start().catch((error) => logger.error({ error }, "Streaming failed to start"));
+  }
 });
 
 process.on("SIGTERM", async () => {
@@ -79,7 +82,9 @@ process.on("SIGTERM", async () => {
   wss.clients.forEach((client) => client.close());
   wss.close();
 
-  await services.polygonService.disconnect();
+  if (streaming) {
+    await streaming.stop();
+  }
 
   server.close(() => {
     logger.info("Server closed");

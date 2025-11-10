@@ -7,7 +7,6 @@ import { defaultStrategyParams } from "../src/config/strategy.defaults";
 import type { SupabaseService } from "../src/services/supabaseService";
 import type { SupabaseSetupsService } from "../src/services/supabaseSetups";
 import type { StrategyDetectorService } from "../src/services/strategyDetector";
-import type { PolygonStreamingService } from "../src/services/polygonStreamingService";
 import type { WatchlistSymbol } from "../src/types";
 
 const buildServices = (): AppServices => {
@@ -38,18 +37,10 @@ const buildServices = (): AppServices => {
     emit: jest.fn(),
   } as unknown as StrategyDetectorService;
 
-  const polygonService = {
-    subscribe: jest.fn(),
-    unsubscribe: jest.fn(),
-    connect: jest.fn().mockResolvedValue(undefined),
-    disconnect: jest.fn().mockResolvedValue(undefined),
-  } as unknown as PolygonStreamingService;
-
   return {
     supabaseService,
     supabaseSetups,
     strategyDetector,
-    polygonService,
     alertRegistry: new AlertRegistry(),
   };
 };

@@ -2,7 +2,6 @@ import { Express, Request, Router } from "express";
 import type { SupabaseService } from "../services/supabaseService.js";
 import { writeLimiter } from "../middleware/rateLimit.js";
 import type { StrategyDetectorService } from "../services/strategyDetector.js";
-import type { PolygonStreamingService } from "../services/polygonStreamingService.js";
 import { WatchlistSymbol } from "../types/index.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {
@@ -19,7 +18,6 @@ const DEMO_USER_ID = process.env.DEMO_USER_ID?.trim();
 interface Services {
   supabaseService: SupabaseService;
   strategyDetector: StrategyDetectorService;
-  polygonService: PolygonStreamingService;
 }
 
 const normalizeSymbol = (input: WatchlistInput | WatchlistSymbol): WatchlistSymbol => ({

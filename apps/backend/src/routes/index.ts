@@ -11,14 +11,12 @@ import { setupChartAnnotationsRoutes } from "./chartAnnotations.js";
 import { SupabaseService } from "../services/supabaseService.js";
 import { SupabaseSetupsService } from "../services/supabaseSetups.js";
 import { StrategyDetectorService } from "../services/strategyDetector.js";
-import { PolygonStreamingService } from "../services/polygonStreamingService.js";
 import { AlertRegistry } from "../alerts/registry.js";
 
 interface Services {
   supabaseService: SupabaseService;
   supabaseSetups: SupabaseSetupsService;
   strategyDetector: StrategyDetectorService;
-  polygonService: PolygonStreamingService;
   alertRegistry: AlertRegistry;
 }
 

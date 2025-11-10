@@ -30,12 +30,6 @@ describe("marketData routes", () => {
       on: jest.fn(),
       emit: jest.fn(),
     } as any,
-    polygonService: {
-      subscribe: jest.fn(),
-      unsubscribe: jest.fn(),
-      connect: jest.fn().mockResolvedValue(undefined),
-      disconnect: jest.fn().mockResolvedValue(undefined),
-    } as any,
     alertRegistry: new AlertRegistry(),
   };
 
