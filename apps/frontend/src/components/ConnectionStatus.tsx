@@ -1,43 +1,46 @@
 import React from "react";
-import { useConnectionStatus } from "../hooks";
-import type { ConnectionStatus as ConnState } from "../hooks/useBackendConnection";
+
+export type ConnectionBannerState =
+  | { state: "healthy"; reason?: string }
+  | { state: "reconnecting"; reason?: string }
+  | { state: "offline"; reason?: string }
+  | { state: "error"; reason?: string };
 
 type Props = {
-  state?: ConnState;
-  reason?: string | null;
-  isLoading?: boolean;
-  isConnected?: boolean;
-  error?: string | null;
-  onReconnect?: () => void;
+  state: ConnectionBannerState["state"];
+  reason?: string;
+  /** Optional retry handler for a “Try again” button */
+  onRetry?: () => void;
 };
 
-export function ConnectionStatus(props: Props) {
-  const hook = useConnectionStatus();
+const styles: Record<Props["state"], string> = {
+  healthy: "bg-green-50 text-green-800 border-green-300",
+  reconnecting: "bg-amber-50 text-amber-800 border-amber-300",
+  offline: "bg-gray-50 text-gray-800 border-gray-300",
+  error: "bg-red-50 text-red-800 border-red-300",
+};
 
-  const isConnected = props.isConnected ?? hook.isConnected;
-  const isLoading = props.isLoading ?? hook.isLoading;
-  const error = props.error ?? hook.error;
-  const connectionStatus = props.state ?? hook.connectionStatus;
-  const connectionReason = props.reason ?? hook.connectionReason;
-  const manualReconnect = props.onReconnect ?? hook.manualReconnect;
-
+export default function ConnectionStatus({ state, reason, onRetry }: Props) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      <span className="font-medium">Status:</span>
-      <span>{connectionStatus}</span>
-      {connectionReason ? <span className="text-zinc-500">– {connectionReason}</span> : null}
-      {isLoading ? <span className="text-zinc-500">(connecting)</span> : null}
-      {!isLoading && !isConnected ? (
-        <button
-          className="ml-2 rounded px-2 py-1 border border-zinc-300 hover:bg-zinc-100"
-          onClick={manualReconnect}
-        >
-          Reconnect
-        </button>
-      ) : null}
-      {error ? <span className="ml-2 text-red-600">Error: {error}</span> : null}
+    <div className={`border rounded-md px-3 py-2 text-sm ${styles[state]}`} role="status">
+      <div className="flex items-center justify-between gap-4">
+        <div className="font-medium">
+          {state === "healthy" && "Connected"}
+          {state === "reconnecting" && "Reconnecting…"}
+          {state === "offline" && "Offline"}
+          {state === "error" && "Connection error"}
+        </div>
+        {onRetry && (
+          <button
+            type="button"
+            className="rounded-md border px-2 py-1 text-xs hover:bg-white/40"
+            onClick={onRetry}
+          >
+            Try again
+          </button>
+        )}
+      </div>
+      {reason && <div className="mt-1 opacity-80">{reason}</div>}
     </div>
   );
 }
-
-export default ConnectionStatus;
