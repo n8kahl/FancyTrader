@@ -6,9 +6,9 @@ WORKDIR /app
 RUN corepack enable
 
 # Copy workspace manifests so pnpm can resolve deps without full sources
+# Copy workspace manifests so pnpm can resolve deps without full sources
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
-COPY apps/backend/package.json apps/backend/
 
 # Install ALL workspace deps (hoisted)
 RUN pnpm install --frozen-lockfile
@@ -34,7 +34,6 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
-COPY --from=builder /app/apps/backend/package.json ./apps/backend/
 
 EXPOSE 3001
 
