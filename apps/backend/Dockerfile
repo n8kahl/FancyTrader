@@ -9,8 +9,6 @@ RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/backend/package.json apps/backend/
-COPY apps/frontend/package.json apps/frontend/
-COPY apps/worker/package.json apps/worker/
 
 # Install ALL workspace deps (hoisted)
 RUN pnpm install --frozen-lockfile
