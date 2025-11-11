@@ -1,3 +1,5 @@
+import { serverEnv } from "@fancytrader/shared/server";
+
 function parseAllowlist(): string[] {
   return (serverEnv.CORS_ALLOWLIST || "")
     .split(",")
