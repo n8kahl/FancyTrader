@@ -9,8 +9,6 @@ const massive = new MassiveClient({
   baseUrl: process.env.MASSIVE_BASE_URL,
 });
 const log = pino({ name: "market-status" });
-const USE_MOCK = process.env.FEATURE_MOCK_MODE === "true";
-const FORCE_FALLBACK = process.env.FORCE_STATUS_FALLBACK === "true";
 
 type MarketSession = "premarket" | "regular" | "aftermarket" | "closed";
 
@@ -75,9 +73,6 @@ export function setupMarketDataRoutes(app: Express): void {
   app.get(
     "/api/market/status",
     asyncHandler(async (_req, res) => {
-      if (USE_MOCK || FORCE_FALLBACK) {
-        return res.status(200).json(fallbackStatus());
-      }
       try {
         const status = await massive.getMarketStatus();
         res.json(normalizeMarketSession(status));
