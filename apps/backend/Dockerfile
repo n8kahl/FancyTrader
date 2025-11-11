@@ -21,9 +21,6 @@ RUN pnpm prune --prod
 FROM node:20-alpine AS runtime
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV PORT=3001
-
 RUN corepack enable
 
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
@@ -35,9 +32,10 @@ USER node
 
 RUN pnpm --filter @fancytrader/backend install --prod --frozen-lockfile
 
-COPY --from=builder --chown=node:node /app/apps/backend/dist ./apps/backend/dist
+	COPY --from=builder --chown=node:node /app/apps/backend/dist ./apps/backend/dist
 
-EXPOSE 3001
+	# Do not set PORT here; Railway injects it at runtime
+	EXPOSE 3001  # optional/documentary only
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://localhost:3001/readyz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
