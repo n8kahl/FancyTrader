@@ -1,3 +1,6 @@
+import { BACKEND_CONFIG } from "../config/backend";
+import type { ServerOutbound } from "@fancytrader/shared";
+
 type SubPayload = { symbols: string[] };
 
 export type WSOutbound =
@@ -44,11 +47,9 @@ export function createWebSocketClient(url: string) {
     ws.send(JSON.stringify(msg));
   };
 
-  const subscribe = (symbols: string[]) =>
-    send({ type: "SUBSCRIBE", payload: { symbols } });
+  const subscribe = (symbols: string[]) => send({ type: "SUBSCRIBE", payload: { symbols } });
 
-  const unsubscribe = (symbols: string[]) =>
-    send({ type: "UNSUBSCRIBE", payload: { symbols } });
+  const unsubscribe = (symbols: string[]) => send({ type: "UNSUBSCRIBE", payload: { symbols } });
 
   const onMessage = (fn: Listener) => {
     listeners.push(fn);
@@ -67,19 +68,81 @@ export function createWebSocketClient(url: string) {
   return { connect, subscribe, unsubscribe, onMessage, close };
 }
 
-// --- Singleton client export for existing imports ---
-function deriveDefaultWsUrl(): string {
-  if (typeof window !== "undefined") {
-    const origin = window.location.origin.replace(/^http/, "ws");
-    return `${origin}/ws`;
+// --- Singleton wrapper for convenience imports and diagnostics consumers ---
+/**
+ * Public message type re-exported for hooks/tests that need to narrow messages.
+ * Includes server outbound messages + simple status/error frames from backend.
+ */
+export type WSMessage =
+  | ServerOutbound
+  | { type: "status"; message: string }
+  | { type: "error"; message: string; code?: string }
+  | { type: "SUBSCRIPTIONS"; symbols: string[] };
+
+/**
+ * Build a module-level client and decorate it with a few convenience helpers
+ * expected by diagnostics and docs: onConnect, onError, getConnectionStatus, disconnect.
+ */
+const _base = createWebSocketClient(BACKEND_CONFIG.wsUrl);
+
+type Unsub = () => void;
+type VoidFn = () => void;
+type ErrFn = (e: unknown) => void;
+
+let _isConnected = false;
+const _connectHandlers = new Set<VoidFn>();
+const _errorHandlers = new Set<ErrFn>();
+
+let _sawStatusMessage = false;
+const _unsubStatus = _base.onMessage((msg: WSMessage) => {
+  if (!_sawStatusMessage && msg && (msg as any).type === "status") {
+    _sawStatusMessage = true;
+    _isConnected = true;
+    for (const fn of _connectHandlers) fn();
   }
-  return "wss://fancy-trader.up.railway.app/ws";
+});
+
+const _origConnect = _base.connect.bind(_base);
+function _connect(): void {
+  try {
+    _origConnect();
+  } catch (e) {
+    for (const fn of _errorHandlers) fn(e);
+    throw e;
+  }
 }
 
-const WS_URL =
-  ((typeof import.meta !== "undefined" ? (import.meta as any)?.env : undefined) as any)
-    ?.VITE_BACKEND_WS_URL || deriveDefaultWsUrl();
+function _disconnect(): void {
+  _isConnected = false;
+  _sawStatusMessage = false;
+  _unsubStatus();
+  _base.close();
+}
 
-export const wsClient = createWebSocketClient(WS_URL);
+function _onConnect(fn: VoidFn): Unsub {
+  _connectHandlers.add(fn);
+  return () => _connectHandlers.delete(fn);
+}
+
+function _onError(fn: ErrFn): Unsub {
+  _errorHandlers.add(fn);
+  return () => _errorHandlers.delete(fn);
+}
+
+function _getConnectionStatus(): boolean {
+  return _isConnected;
+}
+
+export const wsClient = {
+  connect: _connect,
+  close: _base.close,
+  subscribeToSymbols: _base.subscribe,
+  unsubscribeFromSymbols: _base.unsubscribe,
+  onMessage: _base.onMessage,
+  disconnect: _disconnect,
+  onConnect: _onConnect,
+  onError: _onError,
+  getConnectionStatus: _getConnectionStatus,
+};
 
 export type { ServerOutbound, ServerInbound } from "@fancytrader/shared";
