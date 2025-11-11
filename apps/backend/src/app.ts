@@ -217,59 +217,56 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
 
   app.use(errorHandler);
 
+  // --- Streaming flags & Massive-only streamer wiring ---
   const STREAMING_ENABLED = process.env.STREAMING_ENABLED === "true";
-  const ENABLE_POLYGON = featureFlags.enablePolygonStream;
   const ENABLE_MASSIVE = featureFlags.enableMassiveStream;
 
-  log.info({ STREAMING_ENABLED, ENABLE_POLYGON, ENABLE_MASSIVE }, "Streaming flags");
+  log.info({ STREAMING_ENABLED, ENABLE_MASSIVE }, "Streaming flags");
 
-  let streaming: Streamer = null;
+  let streaming: Streamer = {
+    start: async () => {
+      /* noop */
+    },
+    stop: async () => {
+      /* noop */
+    },
+  };
 
-  if (STREAMING_ENABLED) {
-    if (ENABLE_POLYGON) {
-      const key = process.env.POLYGON_API_KEY;
-      if (!key) {
-        throw new Error("POLYGON_API_KEY required when FEATURE_ENABLE_POLYGON_STREAM=true");
-      }
-      const { PolygonStreamingService } = await import("./services/polygonStreamingService.js");
-      const polygonService = new PolygonStreamingService(strategyDetector);
-      streaming = {
-        start: () => polygonService.connect(),
-        stop: () => polygonService.disconnect(),
-      };
-      log.info("Polygon streaming enabled");
-    } else if (ENABLE_MASSIVE) {
-      const key = serverEnv.MASSIVE_API_KEY;
-      if (!key) {
-        throw new Error("MASSIVE_API_KEY required when FEATURE_ENABLE_MASSIVE_STREAM=true");
-      }
-      const { MassiveStreamingService } = await import("./services/massiveStreamingService.js");
-      const massive = new MassiveStreamingService({
-        baseUrl: serverEnv.MASSIVE_WS_BASE,
-        cluster: serverEnv.MASSIVE_WS_CLUSTER,
-        apiKey: key,
-        subscriptions: [],
-        logger: (event, meta) => logger.debug("massive_ws", { event, ...meta }),
-      });
-      massive.on("message", (msg) => logger.debug("massive_ws_message", { msg }));
-      massive.on("error", (error) => logger.error("massive_ws_error", { error }));
-      streaming = {
-        start: async () => {
-          massive.start();
-        },
-        stop: async () => {
-          massive.stop();
-        },
-      };
-      log.info("Massive streaming enabled");
-    } else {
-      log.warn(
-        "STREAMING_ENABLED=true but no provider flag is set; skipping streamer construction"
-      );
+  if (STREAMING_ENABLED && ENABLE_MASSIVE) {
+    const key = serverEnv.MASSIVE_API_KEY;
+    if (!key) {
+      throw new Error("MASSIVE_API_KEY required when enableMassiveStream=true and STREAMING_ENABLED=true");
     }
+
+    const { MassiveStreamingService } = await import("./services/massiveStreamingService.js");
+    const massive = new MassiveStreamingService({
+      baseUrl: serverEnv.MASSIVE_WS_BASE,
+      cluster: serverEnv.MASSIVE_WS_CLUSTER ?? "options",
+      apiKey: key,
+      subscriptions: [],
+      logger: (event: string, meta?: Record<string, unknown>) => {
+        logger.debug("massive_ws", { event, ...(meta ?? {}) });
+      },
+    });
+
+    massive.on("message", (msg: unknown) => logger.debug("massive_ws_message", { msg }));
+    massive.on("error", (error: unknown) => logger.error("massive_ws_error", { error }));
+
+    streaming = {
+      start: async () => {
+        massive.start();
+        globalThis.__WSS_READY__ = true;
+        logger.info("Massive streaming enabled");
+      },
+      stop: async () => {
+        globalThis.__WSS_READY__ = false;
+        massive.stop();
+      },
+    };
   } else {
-    log.warn("Streaming disabled via STREAMING_ENABLED");
+    logger.warn("Streaming disabled or massive flag off; no streamer constructed");
   }
 
+  // keep returning these from createApp / init
   return { app, services, streaming };
 }
