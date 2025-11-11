@@ -57,7 +57,10 @@ export async function listTrades(owner: string): Promise<TradeRecord[]> {
     return (mem[owner] ?? []).sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
   const admin = requireAdmin();
-  logger.info({ userId: owner, url: process.env.SUPABASE_URL?.slice(0, 40) + "…" }, "supabase:listTrades:start");
+  logger.info("supabase:listTrades:start", {
+    userId: owner,
+    url: process.env.SUPABASE_URL?.slice(0, 40) + "…",
+  });
   const q = admin
     .from("trades")
     .select("*")
@@ -65,23 +68,20 @@ export async function listTrades(owner: string): Promise<TradeRecord[]> {
     .order("created_at", { ascending: false });
   const { data, error } = await q;
   if (error) {
-    logger.error(
-      {
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
-        message: error.message,
-        causeCode: (error as any)?.cause?.code,
-        causeErrno: (error as any)?.cause?.errno,
-        causeSyscall: (error as any)?.cause?.syscall,
-        causeAddress: (error as any)?.cause?.address,
-        causePort: (error as any)?.cause?.port,
-      },
-      "supabase:listTrades:error"
-    );
+    logger.error("supabase:listTrades:error", {
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      message: error.message,
+      causeCode: (error as any)?.cause?.code,
+      causeErrno: (error as any)?.cause?.errno,
+      causeSyscall: (error as any)?.cause?.syscall,
+      causeAddress: (error as any)?.cause?.address,
+      causePort: (error as any)?.cause?.port,
+    });
     throw error;
   }
-  logger.info({ count: data?.length ?? 0 }, "supabase:listTrades:success");
+  logger.info("supabase:listTrades:success", { count: data?.length ?? 0 });
   return data ?? [];
 }
 

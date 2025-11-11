@@ -85,13 +85,13 @@ export class MassiveStreamingService extends EventEmitter {
     );
     this.logFn("ws_connecting", { url: wsUrl });
     logger.info(
+      "massive_ws",
       {
         event: "ws_url_computed",
         MASSIVE_WS_BASE: this.options.baseUrl,
         MASSIVE_WS_CLUSTER: this.options.cluster,
         wsUrl,
-      },
-      "massive_ws"
+      }
     );
     this.ws = new WebSocket(wsUrl);
 

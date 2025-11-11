@@ -52,10 +52,16 @@ Tests load `.env.test` files automatically so secrets never leak into CI.
 - Each request increments HTTP counters via `incHttp`. Polygon REST/WS calls also increment success/failure counters for dashboards.
 - `DIAGNOSTICS_ENABLED` gate in the UI can surface mock data instructions when the backend is offline.
 
+## Local build & Docker
+
+1. Run `pnpm install` once, then `pnpm -r build` to compile shared, worker, backend, and frontend artifacts. This mirrors the multi-stage Docker flow.
+2. Build each image locally with `docker build apps/backend -t fancytrader-backend` and `docker build apps/frontend -t fancytrader-frontend`; the Dockerfiles already install the workspace, compile everything, and copy the runtime artifacts (including the new shared/env binaries) into the final stage.
+3. `docker compose up --build` still works (backend runs `node apps/backend/dist/index.js`, frontend serves `apps/frontend/build` via nginx) if you prefer a single command.
+
 ## Deployment workflow
 
 1. Push / PR -> `.github/workflows/ci.yml` runs lint, typecheck, tests (with coverage), build.
-2. Container builds use multi-stage Dockerfiles in `apps/backend` and `apps/frontend`.
+2. Container builds use the new multi-stage Dockerfiles in `apps/backend` and `apps/frontend`; Railway should point each service at the appropriate Dockerfile and the corresponding `.env.example`.
 3. `docker compose up --build` is the quickest way to validate a production-like stack locally.
 
 ## Troubleshooting checklist
