@@ -1,4 +1,7 @@
-# Fancy Trader Workspace
+# FancyTrader Monorepo
+
+> **Authoritative plan:** see **[`docs/AUTHORITATIVE_PLAN.md`](./docs/AUTHORITATIVE_PLAN.md)**.  
+> That document supersedes legacy `docs/PLAN.md` and `plan.md`.
 
 > Monorepo for the Fancy Trader backend (Express + ws), frontend (Vite + React), and shared zod contracts.
 
@@ -83,11 +86,15 @@ packages/
 - Share results or live trades to Discord with `/api/share/discord/*` endpoints.
 - Create price alerts via `/api/alerts`; the evaluator polls Polygon snapshots every `ALERT_POLL_MS` ms and broadcasts `{ type: "alert" }` via the main WS feed.
 
-## Massive/Polygon troubleshooting
+## Massive-first (authoritative)
 
-1. **401 / auth_failed** – Ensure `POLYGON_API_KEY` is set. Options/indices streams require the right entitlements.
-2. **429** – REST helper reads `retry-after` and backs off automatically; for WS you may need to reduce subscription counts.
-3. **Delayed fallback** – Set `POLYGON_FALLBACK_WS_BASE=wss://delayed.polygon.io` to keep demo data flowing when real-time access is unavailable.
+1. **401 / auth_failed** – Ensure `MASSIVE_API_KEY` is set and entitlements cover Options/Indices.
+2. **429** – REST client backs off (jittered, respects `retry-after`); reduce subscriptions if needed.
+3. **Closed/unstable windows** – Snapshots fallback + worker persistence.
+
+## Optional legacy Polygon
+
+If you must use Polygon, flip `FEATURE_POLYGON_ENABLED=true`. Otherwise, it must be **false**.
 
 ## Testing & quality gates
 
@@ -118,6 +125,7 @@ docker compose up --build
 ## Documentation
 
 - `docs/ARCHITECTURE.md` – system overview, service boundaries, data flow.
+- `docs/AUTHORITATIVE_PLAN.md` – ✅ **single source of truth** for roadmap & decisions.
 - `docs/OPERATIONS.md` – ports, env vars, health checks, troubleshooting notes.
 - `docs/SECURITY.md` – secrets, CORS, logging guidance.
 - `docs/TESTING.md` – backend/frontend/Jest/Vitest/Playwright instructions.

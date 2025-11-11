@@ -1,10 +1,10 @@
-# Fancy Trader Backend
+# Fancy Trader Backend (Massive-first)
 
-Real-time trading setup detection backend with Polygon.io (Massive.com) integration, WebSocket streaming, and Discord alerts.
+Real-time trading setup detection backend with **Massive.com** integration (primary), WebSocket streaming, and Discord alerts. Polygon support is **optional** and disabled by default behind `FEATURE_POLYGON_ENABLED=false`.
 
 ## Features
 
-- ✅ **Real-time Market Data Streaming** - WebSocket connection to Polygon.io for live price updates
+- ✅ **Real-time Market Data Streaming** - Massive WS + REST with retries/backoff/circuit
 - ✅ **Automated Setup Detection** - Detects KCU LTP strategies (ORB+PC, EMA Bounce, VWAP, Cloud, etc.)
 - ✅ **Technical Indicators** - EMA, SMA, RSI, VWAP, ATR calculations
 - ✅ **Confluence Analysis** - Multi-factor confluence scoring for high-probability setups
@@ -335,6 +335,8 @@ If WebSocket connection fails:
 1. Verify Supabase URL and service key
 2. Ensure `kv_store_c59dbecd` table exists
 3. Check Supabase project is active
+
+> See **`docs/AUTHORITATIVE_PLAN.md`** for the source-of-truth roadmap and decisions.
 
 ## Support
 
