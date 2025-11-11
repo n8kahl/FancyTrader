@@ -9,6 +9,7 @@ RUN corepack enable
 # Copy workspace manifests so pnpm can resolve deps without full sources
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
+COPY apps/backend/package.json apps/backend/
 
 # Install ALL workspace deps (hoisted)
 RUN pnpm install --frozen-lockfile
