@@ -258,7 +258,23 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
       apiKey: key,
       subscriptions: [],
       logger: (event: string, meta?: Record<string, unknown>) => {
-        logger.debug("massive_ws", { event, ...(meta ?? {}) });
+        const payload = { event, ...(meta ?? {}) };
+        const warnEvents = new Set([
+          "ws_close",
+          "ws_error",
+          "ws_heartbeat_missed",
+          "ws_message_parse_error",
+          "ws_reconnect_scheduled",
+        ]);
+        if (event === "ws_message") {
+          logger.debug("massive_ws", payload);
+          return;
+        }
+        if (warnEvents.has(event)) {
+          logger.warn("massive_ws", payload);
+          return;
+        }
+        logger.info("massive_ws", payload);
       },
     });
 
@@ -340,8 +356,9 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
       markConnected();
       startWatchdog();
     });
-    massive.on("close", () => {
+    massive.on("close", (code?: number) => {
       markDisconnected();
+      logger.warn("Massive WS closed", { code });
     });
     massive.on("heartbeat_missed", (meta?: Record<string, unknown>) => {
       massiveWsHeartbeatMissedTotal.inc();
