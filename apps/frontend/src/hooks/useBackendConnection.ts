@@ -2,7 +2,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getBackendWsUrl } from "../utils/env";
 import { createWebSocketClient } from "../services/websocketClient";
 
-export function useBackendConnection() {
+type UseBackendConnectionReturn = {
+  connected: boolean;
+  subscriptions: string[];
+  lastMessage: any;
+  subscribe(symbols: string[]): void;
+  unsubscribe(symbols: string[]): void;
+};
+
+export function useBackendConnection(): UseBackendConnectionReturn;
+export function useBackendConnection(
+  enableLive?: boolean,
+  deps?: { wsUrl?: string; wsClient?: any; apiClient?: any }
+): UseBackendConnectionReturn;
+
+export function useBackendConnection(enableLive?: boolean, deps?: { wsUrl?: string; wsClient?: any; apiClient?: any }) {
   const [connected, setConnected] = useState(false);
   const [subscriptions, setSubscriptions] = useState<string[]>([]);
   const [lastMessage, setLastMessage] = useState<any>(null);
