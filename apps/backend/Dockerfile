@@ -34,8 +34,7 @@ RUN pnpm --filter @fancytrader/backend install --prod --frozen-lockfile
 
 	COPY --from=builder --chown=node:node /app/apps/backend/dist ./apps/backend/dist
 
-	# Do not set PORT here; Railway injects it at runtime
-	EXPOSE 3001  # optional/documentary only
+	EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://localhost:3001/readyz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
