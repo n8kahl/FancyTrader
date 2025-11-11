@@ -16,8 +16,9 @@ RUN pnpm install --frozen-lockfile
 # Copy full source tree
 COPY . .
 
-# Build shared + backend
-RUN pnpm -r build
+# Build shared + backend only (skip frontend to avoid requiring Vite during backend image builds)
+RUN pnpm --filter @fancytrader/shared build && \
+    pnpm --filter @fancytrader/backend build
 
 # Prune dev deps for production
 RUN pnpm prune --prod

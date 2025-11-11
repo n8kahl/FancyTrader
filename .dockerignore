@@ -1,0 +1,10 @@
+node_modules
+apps/backend/dist
+apps/frontend/build
+apps/worker/dist
+packages/shared/dist
+apps/**/*.log
+.env
+*.tgz
+.git
+tmp
