@@ -53,7 +53,7 @@ Frontend-specific env (e.g., `VITE_BACKEND_URL`) live in `apps/frontend/src/util
 ## Polygon / Massive notes
 
 - **REST v2 aggregates** – `/v2/aggs/ticker/:symbol/range/:mult/:timespan/:from/:to` powers the backtest runner and metrics. We keep `limit` < 50k and cap request windows.
-- **REST v3 pagination** – Helpers in `apps/backend/src/utils/polygonPage.ts` follow `next_url` cursors (with backoff) so endpoints like `/v3/reference/options/contracts` return fully stitched responses.
+- **REST v3 pagination** – Helpers in `apps/backend/src/utils/pagedFetch.ts` follow `next_url` cursors (with backoff) so endpoints like `/v3/reference/options/contracts` return fully stitched responses.
 - **WebSocket clusters** – `POLYGON_WS_CLUSTER` selects `/stocks`, `/options`, `/indices`, etc. We build channels accordingly (e.g., `T.O:SYMBOL` for options). If real-time auth fails, we automatically reconnect to `POLYGON_FALLBACK_WS_BASE` for delayed feeds.
 - **Provider limits** – Hitting Polygon's `max_connections` flag puts the backend in a `SERVICE_STATE=degraded` mode. We broadcast that state to clients, optionally enable a mock feed, and delay reconnection by `FEATURE_POLYGON_MAX_SLEEP_MS` (default 15 min) so only one replica owns the live stream.
 

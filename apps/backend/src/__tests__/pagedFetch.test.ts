@@ -1,6 +1,6 @@
 import axios from "axios";
 import type { AxiosResponse } from "axios";
-import { followNextUrls, encodeCursor, decodeCursor } from "../utils/polygonPage.js";
+import { followNextUrls, encodeCursor, decodeCursor } from "../utils/pagedFetch.js";
 
 jest.mock("axios");
 const mockedAxios = axios as jest.Mocked<typeof axios>;

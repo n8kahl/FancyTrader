@@ -36,7 +36,7 @@ Frontend-specific env (e.g., `VITE_BACKEND_URL`) live in `apps/frontend/src/util
 ## Middleware / CORS
 
 - Helmet, compression, JSON/urlencoded parsers, request logging, and metrics middleware are installed in `createApp` before any router.
-- Both HTTP and WS guards reference the same `CORS_ALLOWLIST` (comma-separated); preview deploys matching `https://fancy-trader-*.vercel.app` are allowed automatically.
+- Both HTTP and WS guards reference the same `CORS_ALLOWLIST` (comma-separated); make sure it lists `https://fancy-trader-front.up.railway.app` plus any local origins you allow.
 
 ## Rate limits & upstream safety
 

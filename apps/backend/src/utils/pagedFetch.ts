@@ -1,6 +1,6 @@
 import axios from "axios";
 import { setTimeout as sleep } from "node:timers/promises";
-import { incPolygonRest } from "./metrics.js";
+import { incMassiveRest } from "./metrics.js";
 
 export interface PageShape<T> {
   results: T[];
@@ -66,7 +66,7 @@ async function fetchWithBackoff(
         validateStatus: () => true,
       });
       const ok = response.status >= 200 && response.status < 300;
-      incPolygonRest(ok, response.status);
+      incMassiveRest(ok, response.status);
 
       if (response.status === 429) {
         const retryAfter = Number(response.headers["retry-after"]);
@@ -80,15 +80,15 @@ async function fetchWithBackoff(
 
       if (!ok) {
         const body = typeof response.data === "string" ? response.data : JSON.stringify(response.data ?? {});
-        throw new Error(`Polygon request failed (${response.status}): ${body}`);
+        throw new Error(`Upstream request failed (${response.status}): ${body}`);
       }
 
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        incPolygonRest(false, error.response?.status);
+        incMassiveRest(false, error.response?.status);
       } else {
-        incPolygonRest(false);
+        incMassiveRest(false);
       }
       throw error instanceof Error ? error : new Error(String(error));
     }

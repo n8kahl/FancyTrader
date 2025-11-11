@@ -4,8 +4,8 @@ import type { OptionContract } from "@fancytrader/shared";
 import { serverEnv } from "@fancytrader/shared/server";
 import { logger } from "../utils/logger.js";
 import { Bar } from "../types/index.js";
-import { followNextUrls, encodeCursor, decodeCursor, type PageShape } from "../utils/polygonPage.js";
-import { incPolygonRest } from "../utils/metrics.js";
+import { followNextUrls, encodeCursor, decodeCursor, type PageShape } from "../utils/pagedFetch.js";
+import { incMassiveRest } from "../utils/metrics.js";
 import { HttpClient } from "../utils/http.js";
 
 const MASSIVE_BASE_URL = "https://api.massive.com";
@@ -62,7 +62,7 @@ const chainPagedResponseSchema = z.object({
 
 const logError = (context: string, error: unknown): void => {
   logger.error(
-    "PolygonClient error",
+    "MassiveRestClient error",
     {
       context,
       err:
@@ -159,14 +159,14 @@ export class MassiveRestClient {
         `/v2/aggs/ticker/${symbol}/range/${multiplier}/${timespan}/${from}/${to}`,
         { params: { adjusted: true, sort: "asc", limit } }
       );
-      incPolygonRest(true, response.status);
+      incMassiveRest(true, response.status);
 
       const data = aggregatesResponseSchema.parse(response.data);
       const results = data.results ?? [];
       return results.map((bar) => mapAggregate(symbol, bar));
     } catch (error: unknown) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      incPolygonRest(false, status);
+      incMassiveRest(false, status);
       logError(`Error fetching aggregates for ${symbol}`, error);
       throw error;
     }
@@ -177,12 +177,12 @@ export class MassiveRestClient {
       const response = await this.http.get(
         `/v2/snapshot/locale/us/markets/stocks/tickers/${symbol}`
       );
-      incPolygonRest(true, response.status);
+      incMassiveRest(true, response.status);
       const data = snapshotResponseSchema.parse(response.data);
       return data.ticker;
     } catch (error: unknown) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      incPolygonRest(false, status);
+      incMassiveRest(false, status);
       logError(`Error fetching snapshot for ${symbol}`, error);
       throw error;
     }
@@ -209,7 +209,7 @@ export class MassiveRestClient {
       return parsed.results.map(mapChainRow);
     } catch (error: unknown) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      incPolygonRest(false, status);
+      incMassiveRest(false, status);
       logError(`Error fetching options contracts for ${underlying}`, error);
       throw error;
     }
@@ -251,12 +251,12 @@ export class MassiveRestClient {
       const response = await this.http.get(
         `/v3/snapshot/options/${underlyingSymbol}/${optionSymbol}`
       );
-      incPolygonRest(true, response.status);
+      incMassiveRest(true, response.status);
       const data = optionsSnapshotSchema.parse(response.data);
       return data.results ?? null;
     } catch (error: unknown) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      incPolygonRest(false, status);
+      incMassiveRest(false, status);
       logError("Error fetching options snapshot", error);
       throw error;
     }
@@ -265,13 +265,13 @@ export class MassiveRestClient {
   async getPreviousClose(symbol: string): Promise<Bar | null> {
     try {
       const response = await this.http.get(`/v2/aggs/ticker/${symbol}/prev`);
-      incPolygonRest(true, response.status);
+      incMassiveRest(true, response.status);
       const data = aggregatesResponseSchema.parse(response.data);
       const bar = data.results?.[0];
       return bar ? mapAggregate(symbol, bar) : null;
     } catch (error: unknown) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      incPolygonRest(false, status);
+      incMassiveRest(false, status);
       logError(`Error fetching previous close for ${symbol}`, error);
       return null;
     }
@@ -280,11 +280,11 @@ export class MassiveRestClient {
   async getMarketStatus(): Promise<unknown> {
     try {
       const response = await this.http.get("/v1/marketstatus/now");
-      incPolygonRest(true, response.status);
+      incMassiveRest(true, response.status);
       return marketStatusSchema.parse(response.data);
     } catch (error: unknown) {
       const status = axios.isAxiosError(error) ? error.response?.status : undefined;
-      incPolygonRest(false, status);
+      incMassiveRest(false, status);
       logError("Error fetching market status", error);
       throw error;
     }

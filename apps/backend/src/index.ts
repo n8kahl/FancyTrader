@@ -3,9 +3,10 @@ import type { ServerOutbound } from "@fancytrader/shared";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import { setupWebSocketHandler } from "./websocket/handler.js";
-import { PolygonClient } from "./services/massiveClient.js";
+import { MassiveRestClient } from "./services/massiveClient.js";
 import { AlertEvaluator, type AlertBroadcastPayload } from "./alerts/evaluator.js";
 import { logger } from "./utils/logger.js";
+import { Config } from "./config.js";
 import { createApp } from "./app.js";
 import { serverEnv } from "@fancytrader/shared/server";
 import { validateEnv } from "./utils/envCheck.js";
@@ -46,6 +47,12 @@ try {
     maxPayload: serverEnv.WS_MAX_PAYLOAD_BYTES,
   });
   server.on("upgrade", (req, socket, head) => {
+    const origin = req.headers.origin;
+    if (!origin || !Config.allowedOrigins.includes(origin)) {
+      socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+      socket.destroy();
+      return;
+    }
     if (req.url === "/ws") {
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit("connection", ws, req);
@@ -56,7 +63,7 @@ try {
   });
   globalThis.__WSS_READY__ = false;
 
-  const polygonClient = new PolygonClient();
+  const massiveClient = new MassiveRestClient();
 
   const broadcastAlert = (payload: AlertBroadcastPayload): void => {
     const message: ServerOutbound = { type: "alert", ...payload };
@@ -68,7 +75,7 @@ try {
     }
   };
 
-  const alertEvaluator = new AlertEvaluator(services.alertRegistry, polygonClient, broadcastAlert);
+  const alertEvaluator = new AlertEvaluator(services.alertRegistry, massiveClient, broadcastAlert);
 
   setupWebSocketHandler(
     wss,
@@ -86,9 +93,9 @@ try {
     globalThis.__WSS_READY__ = false;
   });
 
-  const PORT = process.env.PORT || 8080;
+  const PORT = Config.port;
 
-  server.listen(PORT, () => {
+  server.listen(PORT, "0.0.0.0", () => {
     logger.info(`🚀 Fancy Trader Backend running on port ${PORT}`);
     logger.info(`WebSocket available at ws://localhost:${PORT}/ws`);
     logger.info(`Environment: ${process.env.NODE_ENV}`);

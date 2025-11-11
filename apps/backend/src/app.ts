@@ -3,6 +3,7 @@ import express, { type Request, type Response } from "express";
 import compression from "compression";
 import cors from "cors";
 import helmet from "helmet";
+import configRouter from "./routes/config.js";
 import { healthRouter } from "./routes/health.js";
 import { setupRoutes } from "./routes/index.js";
 import { snapshotsRouter } from "./routes/snapshots.js";
@@ -30,6 +31,7 @@ import { requestId } from "./middleware/requestId.js";
 import { serverEnv } from "@fancytrader/shared/server";
 import { featureFlags } from "./config/features.js";
 import pino from "pino";
+import { Config } from "./config.js";
 
 const log = pino({ name: "app" });
 const corsAllowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
@@ -62,42 +64,19 @@ function getRoutePath(req: Request): string {
   return typeof maybe.originalUrl === "string" ? maybe.originalUrl : "/";
 }
 
-function computeAllowedOrigins(): string[] {
-  const list =
-    serverEnv.CORS_ALLOWLIST?.split(",").map((value: string) => value.trim()).filter(Boolean) ?? [];
-  if (list.length > 0) {
-    return list;
-  }
-  return ["http://localhost:4173", "http://localhost:5173", "https://fancy-trader-front.up.railway.app"];
-}
+const allowedOrigins = Config.allowedOrigins;
 
-function isOriginAllowed(origin: string | undefined | null, allowedOrigins: string[]): boolean {
-  if (!origin) {
-    return true;
-  }
-  return allowedOrigins.includes(origin);
-}
+const isOriginAllowed = (origin: string | undefined | null): boolean =>
+  typeof origin === "string" && allowedOrigins.includes(origin);
 
-function resolveAllowedOrigin(origin: string | undefined | null, allowedOrigins: string[]): string {
-  if (origin && isOriginAllowed(origin, allowedOrigins)) {
-    return origin;
-  }
-  return allowedOrigins[0];
-}
-
-function attachCorsHeaders(
-  res: Response,
-  origin: string | undefined | null,
-  allowedOrigins: string[]
-): void {
-  const allowedOrigin = resolveAllowedOrigin(origin, allowedOrigins);
-  res.header("Access-Control-Allow-Origin", allowedOrigin);
+const attachCorsHeaders = (res: Response, origin: string): void => {
+  res.header("Access-Control-Allow-Origin", origin);
   res.header("Access-Control-Allow-Credentials", "true");
   res.header("Access-Control-Allow-Methods", corsAllowedMethods.join(", "));
   res.header("Access-Control-Allow-Headers", corsAllowedHeaders.join(", "));
   res.header("Access-Control-Expose-Headers", corsExposedHeaders.join(", "));
   res.header("Vary", "Origin");
-}
+};
 
 export interface AppServices {
   supabaseService: SupabaseService;
@@ -119,7 +98,6 @@ export interface CreateAppResult {
 }
 
 export async function createApp(options: CreateAppOptions = {}): Promise<CreateAppResult> {
-  const allowedOrigins = computeAllowedOrigins();
 
   const strategyDetector =
     options.services?.strategyDetector ?? new StrategyDetectorService(defaultStrategyParams);
@@ -145,11 +123,15 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
 
   const corsOptions: cors.CorsOptions = {
     origin(origin, callback) {
-      if (isOriginAllowed(origin, allowedOrigins)) {
+      if (!origin) {
+        callback(new Error("CORS blocked (origin missing)"), false);
+        return;
+      }
+      if (isOriginAllowed(origin)) {
         callback(null, true);
         return;
       }
-      callback(new Error(`CORS not allowed for this origin: ${origin ?? "<unknown>"}`));
+      callback(new Error(`CORS not allowed for this origin: ${origin}`), false);
     },
     credentials: true,
     methods: corsAllowedMethods,
@@ -163,8 +145,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
 
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (!origin || isOriginAllowed(origin, allowedOrigins)) {
-      attachCorsHeaders(res, origin, allowedOrigins);
+    if (origin && isOriginAllowed(origin)) {
+      attachCorsHeaders(res, origin);
     }
     next();
   });
@@ -191,6 +173,7 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
   });
 
   app.use(healthRouter);
+  app.use(configRouter);
   app.get("/api/metrics", async (req, res) => {
     const configured = (process.env.ADMIN_KEY || "").trim();
     if (!configured) {

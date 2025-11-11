@@ -3,14 +3,14 @@ import client from "prom-client";
 export interface Counters {
   http: Record<string, number>;
   ws: { connected: number; totalConnections: number };
-  polygon: { restCalls: number; rest429: number; wsMessages: number };
+  massive: { restCalls: number; rest429: number; wsMessages: number };
   startedAt: number;
 }
 
 export const metrics: Counters = {
   http: {},
   ws: { connected: 0, totalConnections: 0 },
-  polygon: { restCalls: 0, rest429: 0, wsMessages: 0 },
+  massive: { restCalls: 0, rest429: 0, wsMessages: 0 },
   startedAt: Date.now(),
 };
 
@@ -48,16 +48,16 @@ export function onWsDisconnect(): void {
 }
 
 export function incMassiveRest(ok: boolean, status?: number): void {
-  metrics.polygon.restCalls += 1;
+  metrics.massive.restCalls += 1;
   if (!ok || status === 429) {
-    metrics.polygon.rest429 += 1;
+    metrics.massive.rest429 += 1;
   }
 }
 
 export const incPolygonRest = incMassiveRest;
 
 export function incPolygonWsMessages(count = 1): void {
-  metrics.polygon.wsMessages += count;
+  metrics.massive.wsMessages += count;
 }
 
 // === Massive WebSocket metrics ===

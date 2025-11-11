@@ -1,9 +1,10 @@
 import axios from "axios";
-import { serverEnv } from "@fancytrader/shared/server";
+import { Config } from "../config.js";
 
-const BASE = serverEnv.MASSIVE_REST_BASE;
-const KEY = serverEnv.MASSIVE_API_KEY;
-const MODE = serverEnv.MASSIVE_AUTH_MODE.toLowerCase() as "query" | "header";
+const { massive, timeouts } = Config;
+const BASE = massive.restBase;
+const KEY = massive.apiKey;
+const MODE = massive.authMode;
 
 if (!KEY) {
   throw new Error("MASSIVE_API_KEY is required");
@@ -19,13 +20,13 @@ function withAuth(url: string) {
 
 export async function getMarketStatusNow(): Promise<any> {
   const { url, headers } = withAuth(`${BASE}/v1/marketstatus/now`);
-  const { data } = await axios.get(url, { headers, timeout: 5000 });
+  const { data } = await axios.get(url, { headers, timeout: timeouts.http });
   return data;
 }
 
 export async function getUpcomingCalendar(): Promise<any[]> {
   const { url, headers } = withAuth(`${BASE}/v1/marketstatus/upcoming`);
-  const { data } = await axios.get(url, { headers, timeout: 5000 });
+  const { data } = await axios.get(url, { headers, timeout: timeouts.http });
   return Array.isArray(data) ? data : [];
 }
 
