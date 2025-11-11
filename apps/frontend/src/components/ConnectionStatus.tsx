@@ -1,13 +1,8 @@
 import React from "react";
-
-export type ConnectionBannerState =
-  | { state: "healthy"; reason?: string }
-  | { state: "reconnecting"; reason?: string }
-  | { state: "offline"; reason?: string }
-  | { state: "error"; reason?: string };
+import type { ConnectionBannerState } from "../hooks/useBackendConnection";
 
 type Props = {
-  state: ConnectionBannerState["state"];
+  state: ConnectionBannerState;
   reason?: string;
   /** Optional retry handler for a “Try again” button */
   onRetry?: () => void;
@@ -16,7 +11,10 @@ type Props = {
 const styles: Record<Props["state"], string> = {
   healthy: "bg-green-50 text-green-800 border-green-300",
   reconnecting: "bg-amber-50 text-amber-800 border-amber-300",
+  degraded: "bg-amber-50 text-amber-800 border-amber-300",
+  connecting: "bg-blue-50 text-blue-800 border-blue-300",
   offline: "bg-gray-50 text-gray-800 border-gray-300",
+  closed: "bg-zinc-50 text-zinc-800 border-zinc-300",
   error: "bg-red-50 text-red-800 border-red-300",
 };
 

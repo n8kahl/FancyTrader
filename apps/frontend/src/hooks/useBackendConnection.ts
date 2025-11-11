@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { createWebSocketClient, type WSMessage } from "../services/websocketClient";
-import { getBackendConnectionDeps } from "./backendConnectionDeps";
 
 /** Exported for ConnectionStatus component props */
 export type ConnectionBannerState =
@@ -9,7 +8,8 @@ export type ConnectionBannerState =
   | "offline"
   | "error"
   | "closed"
-  | "connecting";
+  | "connecting"
+  | "reconnecting";
 
 /** Reuse the deps type without re-declaring it */
 export type BackendConnectionDependencies =
@@ -40,14 +40,12 @@ function computeBanner(
   return { state, reason };
 }
 
-const deps = getBackendConnectionDeps();
-
 export function useBackendConnection() {
   const [connected, setConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
   const [subscriptions, setSubscriptions] = useState<string[]>([]);
 
-  const client = useMemo(() => createWebSocketClient(deps.wsClient.getConnectionState() ? undefined : deps.wsClient), [deps.wsClient]);
+  const client = useMemo(() => createWebSocketClient(), []);
 
   useEffect(() => {
     client.connect();

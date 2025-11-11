@@ -178,7 +178,7 @@ export default function App({ backendDeps }: AppProps = {}) {
     connectionStatus,
     connectionReason,
     manualReconnect,
-  } = useBackendConnection(!useMockData, backendDeps);
+  } = useBackendConnection();
 
   // Options Trading State
   const [contractSelectorTrade, setContractSelectorTrade] = useState<Trade | null>(null);
