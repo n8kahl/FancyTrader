@@ -40,15 +40,14 @@ function computeBanner(
   return { state, reason };
 }
 
-const defaultDeps = getBackendConnectionDeps();
+const deps = getBackendConnectionDeps();
 
 export function useBackendConnection() {
-  const deps = defaultDeps;
   const [connected, setConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
   const [subscriptions, setSubscriptions] = useState<string[]>([]);
 
-  const client = useMemo(() => createWebSocketClient(deps.wsUrl), [deps.wsUrl]);
+  const client = useMemo(() => createWebSocketClient(deps.wsClient.getConnectionState() ? undefined : deps.wsClient), [deps.wsClient]);
 
   useEffect(() => {
     client.connect();
@@ -64,8 +63,8 @@ export function useBackendConnection() {
     });
 
     const offState = client.onStateChange((st) => {
-      if (st === "open") setConnected(true);
-      if (st === "closed") setConnected(false);
+      if (st === "connected") setConnected(true);
+      if (st === "disconnected") setConnected(false);
     });
 
     const offErr = client.onError(() => {});
@@ -74,7 +73,7 @@ export function useBackendConnection() {
       offMsg();
       offState();
       offErr();
-      client.close(1000, "cleanup");
+      client.close();
     };
   }, [client]);
 
@@ -89,7 +88,7 @@ export function useBackendConnection() {
   };
 
   const manualReconnect: (..._args: any[]) => void = () => {
-    client.close(4001, "manual_reconnect");
+    client.disconnect();
     client.connect();
   };
 
@@ -108,15 +107,12 @@ export function useBackendConnection() {
     subscribeToSymbols: subscribe,
     unsubscribeFromSymbols: unsubscribe,
     connectionStatus: banner.state,
-    connectionReason: banner.reason,
+    connectionReason: banner.reason ?? null,
     manualReconnect,
   };
 }
 
-export function useConnectionStatus(
-  _skipRealtime?: boolean,
-  _deps?: BackendConnectionDependencies
-) {
+export function useConnectionStatus(_skipRealtime?: boolean, _deps?: BackendConnectionDependencies) {
   const { connectionStatus, connectionReason, manualReconnect } = useBackendConnection();
   return { connectionStatus, connectionReason, manualReconnect };
 }
