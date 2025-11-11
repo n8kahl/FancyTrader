@@ -1,36 +1,15 @@
-import pino from "pino";
 import { Express } from "express";
-import { MassiveClient, marketToMode } from "@fancytrader/shared";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { symbolParamSchema } from "../validation/schemas.js";
+import pino from "pino";
+import {
+  computeNextTimes,
+  getMarketStatusNow,
+  getUpcomingCalendar,
+  normalizeSession,
+} from "../services/massiveStatus.js";
 
-const massive = new MassiveClient({
-  apiKey: process.env.MASSIVE_API_KEY ?? "",
-  baseUrl: process.env.MASSIVE_BASE_URL,
-});
 const log = pino({ name: "market-status" });
-
-type MarketSession = "premarket" | "regular" | "aftermarket" | "closed";
-
-function normalizeMarketSession(raw: any) {
-  const session = marketToMode(raw);
-  const toTs = (value: any) => (typeof value === "number" ? value : (value && Date.parse(value)) || null);
-  return {
-    session,
-    nextOpen: toTs(raw?.next_open ?? raw?.calendar?.next_open),
-    nextClose: toTs(raw?.next_close ?? raw?.calendar?.next_close),
-    source: "massive" as const,
-    raw,
-  };
-}
-
-const fallbackStatus = () => ({
-  session: "premarket" as MarketSession,
-  nextOpen: null,
-  nextClose: null,
-  source: "fallback",
-  raw: null,
-});
 
 export function setupMarketDataRoutes(app: Express): void {
   app.get(
@@ -39,12 +18,13 @@ export function setupMarketDataRoutes(app: Express): void {
       const { symbol } = symbolParamSchema.parse(req.params);
       const normalizedSymbol = symbol.toUpperCase();
       try {
-        const snapshot = await massive.getIndexSnapshots([normalizedSymbol]);
+        const snapshot = await getMarketStatusNow();
         res.json({ symbol: normalizedSymbol, data: snapshot });
       } catch (error) {
-        res
-          .status(503)
-          .json({ error: "Massive error", detail: (error as Error).message ?? String(error) });
+        res.status(503).json({
+          error: "Massive error",
+          detail: (error as Error).message ?? String(error),
+        });
       }
     })
   );
@@ -55,17 +35,13 @@ export function setupMarketDataRoutes(app: Express): void {
       const { symbol } = symbolParamSchema.parse(req.params);
       const normalizedSymbol = symbol.toUpperCase();
       try {
-        const aggs = (await massive.getMinuteAggs(normalizedSymbol, 390)) as any;
-        const results = Array.isArray(aggs?.results) ? aggs.results : [];
-        if (!results.length) {
-          res.status(404).json({ error: "Previous close data not found" });
-          return;
-        }
-        res.json({ symbol: normalizedSymbol, data: results[results.length - 1] });
+        const snapshot = await getMarketStatusNow();
+        res.json({ symbol: normalizedSymbol, data: snapshot });
       } catch (error) {
-        res
-          .status(503)
-          .json({ error: "Massive error", detail: (error as Error).message ?? String(error) });
+        res.status(503).json({
+          error: "Massive error",
+          detail: (error as Error).message ?? String(error),
+        });
       }
     })
   );
@@ -74,18 +50,47 @@ export function setupMarketDataRoutes(app: Express): void {
     "/api/market/status",
     asyncHandler(async (_req, res) => {
       try {
-        const status = await massive.getMarketStatus();
-        res.json(normalizeMarketSession(status));
-      } catch (error: any) {
-        log.warn(
-          {
-            code: error?.response?.status,
-            url: error?.config?.url,
-            data: error?.response?.data,
-          },
-          "Massive status failed; serving fallback"
+        const raw = await getMarketStatusNow();
+        const session = normalizeSession(raw?.market);
+        const isOpen = session === "open";
+        const isPremarket = session === "early_trading";
+        const isAfterHours = session === "late_trading";
+        let nextOpen: string | null = null;
+        let nextClose: string | null = null;
+        try {
+          const upcoming = await getUpcomingCalendar();
+          const { nextOpen: no, nextClose: nc } = computeNextTimes(
+            upcoming,
+            raw?.serverTime ?? new Date().toISOString()
+          );
+          nextOpen = no;
+          nextClose = nc;
+        } catch {
+          /* ignored */
+        }
+        const exchangeStates = raw?.exchanges ?? {};
+        log.info(
+          { market: raw?.market, session, nextOpen, nextClose },
+          "Massive status fetched"
         );
-        return res.status(200).json(fallbackStatus());
+        return res.status(200).json({
+          source: "massive",
+          session,
+          isOpen,
+          isPremarket,
+          isAfterHours,
+          nextOpen,
+          nextClose,
+          exchangeStates,
+          raw,
+        });
+      } catch (error: any) {
+        const status = error?.response?.status ?? 502;
+        log.warn({ status, url: error?.config?.url }, "Massive status failed");
+        return res.status(status).json({
+          source: "massive",
+          error: error?.response?.data ?? { message: String(error?.message ?? error) },
+        });
       }
     })
   );

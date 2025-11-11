@@ -1,6 +1,7 @@
 import axios from "axios";
 import { z } from "zod";
 import type { OptionContract } from "@fancytrader/shared";
+import { serverEnv } from "@fancytrader/shared/server";
 import { logger } from "../utils/logger.js";
 import { Bar } from "../types/index.js";
 import { followNextUrls, encodeCursor, decodeCursor, type PageShape } from "../utils/polygonPage.js";
@@ -131,12 +132,8 @@ export class MassiveRestClient {
   }
 
   constructor() {
-    this.baseUrl = process.env.MASSIVE_BASE_URL || MASSIVE_BASE_URL;
-    this.apiKey = process.env.MASSIVE_API_KEY || "";
-
-    if (!this.apiKey) {
-      throw new Error("MASSIVE_API_KEY is required");
-    }
+    this.baseUrl = serverEnv.MASSIVE_REST_BASE;
+    this.apiKey = serverEnv.MASSIVE_API_KEY;
 
     this.http = new HttpClient(this.baseUrl, {
       params: { apiKey: this.apiKey },

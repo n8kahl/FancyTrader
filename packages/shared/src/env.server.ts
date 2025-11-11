@@ -18,10 +18,11 @@ const ServerEnvSchema = z
     CORS_ALLOWLIST: z.string().default("http://localhost:5173,http://localhost:5174"),
 
     // Massive REST + WS
-    MASSIVE_BASE_URL: z.string().url().default("https://api.massive.com"),
+    MASSIVE_REST_BASE: z.string().url().default("https://api.massive.com"),
     MASSIVE_WS_BASE: z.string().url().default("wss://socket.massive.com"),
     MASSIVE_WS_CLUSTER: z.string().default("options"),
-    MASSIVE_API_KEY: z.string().optional(),
+    MASSIVE_API_KEY: z.string().min(1),
+    MASSIVE_AUTH_MODE: z.enum(["query", "header"]).default("query"),
 
     // Feature flags
     FEATURE_MOCK_MODE: z.coerce.boolean().default(false),
