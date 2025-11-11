@@ -21,8 +21,9 @@ ARG VITE_BACKEND_URL
 ARG VITE_BACKEND_WS_URL
 ARG VITE_DEMO_USER_ID
 
-# Build tokens + frontend
-RUN pnpm -w build:tokens && \
+# Build shared libs, tokens, and frontend
+RUN pnpm --filter @fancytrader/shared build && \
+    pnpm -w build:tokens && \
     pnpm --filter @fancytrader/frontend build
 
 # --- runtime stage ---
