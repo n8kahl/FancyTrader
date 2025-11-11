@@ -12,7 +12,7 @@ RUN pnpm -w --filter ./packages/shared build \
 FROM node:20-alpine
 WORKDIR /app
 RUN npm i -g serve
-COPY --from=build /app/apps/frontend/build ./dist
+COPY --from=build /app/apps/frontend/dist ./dist
 ENV PORT=3000
 EXPOSE 3000
 CMD ["serve", "-s", "dist", "-l", "3000"]
