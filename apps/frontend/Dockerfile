@@ -6,6 +6,8 @@ RUN corepack enable
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/frontend/package.json apps/frontend/
 COPY packages/shared/package.json packages/shared/
+COPY tsconfig.base.json .
+COPY tools tools
 
 RUN pnpm install --frozen-lockfile
 
