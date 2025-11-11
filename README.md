@@ -3,7 +3,7 @@
 > **Authoritative plan:** see **[`docs/AUTHORITATIVE_PLAN.md`](./docs/AUTHORITATIVE_PLAN.md)**.  
 > That document supersedes legacy `docs/PLAN.md` and `plan.md`.
 
-> Monorepo for the Fancy Trader backend (Express + ws), frontend (Vite + React), and shared zod contracts.
+> Monorepo for the Fancy Trader backend (Express + ws), frontend (Vite + React), worker, and shared contracts.
 
 ## Quickstart (5 minutes)
 
@@ -11,14 +11,13 @@
    - Node.js 20.x (use `.nvmrc`), [pnpm 9+](https://pnpm.io/installation).
 2. **Install dependencies**
    ```bash
-   pnpm install
+   pnpm install --frozen-lockfile
    ```
 3. **Configure environment**
    ```bash
    cp .env.example .env
-   # fill in POLYGON_API_KEY and (optionally) DISCORD_WEBHOOK_URL
    ```
-   The backend reads the same `.env` file (via `dotenv`) when you run dev or build.
+   Fill in the canonical `MASSIVE_*`, Supabase, and Discord values as needed; compete env reference in `.env.example`.
 4. **Run everything**
    ```bash
    pnpm --filter @fancytrader/backend dev   # http://localhost:${PORT:-8080}/api + ws
@@ -39,25 +38,13 @@
 
 ## Environment reference
 
-| Variable               | Description |
-|------------------------|-------------|
-| `POLYGON_API_KEY`      | Required for both Polygon REST (v2/v3) + websockets.
-| `POLYGON_WS_CLUSTER`   | One of `stocks`, `options`, `indices`, `forex`, `crypto`. Defaults to `options`.
-| `POLYGON_WS_ENABLED`   | Legacy toggle for ws streaming (still honored, but prefer `FEATURE_ENABLE_POLYGON_STREAM`).
-| `FEATURE_ENABLE_POLYGON_STREAM` | Master switch for Polygon WS ownership (disable in previews/CI to avoid consuming the real feed).
-| `FEATURE_POLYGON_BACKOFF_ON_MAX` | When Polygon returns `max_connections`, wait before reconnecting (defaults to `true`).
-| `FEATURE_POLYGON_MAX_SLEEP_MS` | Backoff duration in ms (default `900000`, i.e. 15 minutes).
-| `FEATURE_ENABLE_MOCK_STREAM` | Emit mock heartbeats when the real feed is unavailable (off by default).
-| `POLYGON_WS_BASE`      | (optional) Override realtime socket base (`wss://socket.polygon.io`).
-| `POLYGON_FALLBACK_WS_BASE` | (optional) Delayed feed fallback (`wss://delayed.polygon.io`).
-| `ALERT_POLL_MS`        | REST polling cadence for alert evaluator.
-| `ALERT_COOLDOWN_MS`    | Minimum time between alert firings per rule.
-| `PORT`                 | Backend HTTP/WS port (default 8080, sample `.env` uses 3001).
-| `DISCORD_WEBHOOK_URL`  | Optional webhook to share trades/backtests.
-| `ADMIN_KEY`           | Required for `/api/metrics` (header `x-admin-key`).
-| `ALLOWED_WS_ORIGINS`  | Comma-separated websocket allowlist (defaults to allow all when blank).
+Review the full canonical list in `.env.example` and `docs/OPERATIONS.md`; those files describe:
 
-Frontend-specific env (e.g., `VITE_BACKEND_URL`) live in `apps/frontend/src/utils/env.ts` and can be sourced from `.env`/`.env.local` per Vite conventions. See `.env.example` for defaults and `.env.test` for the deterministic values used by Jest/Vitest.
+- project-wide vars: `NODE_ENV`, `CORS_ALLOWLIST`, `MASSIVE_*`, `RATE_LIMIT_*`, `WS_*`, `SUPABASE_*`, `DISCORD_*`, `ADMIN_KEY`, `MIN_INSTANCES`, `MAX_INSTANCES`
+- service overrides: backend (`PORT`), frontend (`VITE_BACKEND_URL`, `VITE_BACKEND_WS_URL`, `VITE_DEMO_USER_ID`), worker (`WORKER_SYMBOLS`, `WORKER_METRICS_PORT`)
+- deprecated flags that no longer affect behavior: `ALLOWED_WS_ORIGINS`, `CORS_ORIGINS`, `FRONTEND_ORIGINS`, `RATE_ENABLED`, `RATE_MAX`, `RATE_WINDOW_MS`
+
+Frontend-specific env (e.g., `VITE_BACKEND_URL`) live in `apps/frontend/src/utils/env.ts` and can be sourced from `.env`/`.env.local` per Vite conventions.
 
 ## Market session states
 
@@ -110,7 +97,7 @@ docker compose up --build
 ```
 
 - Backend image: multi-stage build under `apps/backend/Dockerfile` (Node 20 + pnpm, copies built `dist`). Exposes port 3001.
-- Frontend image: `apps/frontend/Dockerfile` builds the Vite bundle and serves it via nginx with SPA fallback. Exposes port 80 (published as 5173).
+- Frontend image: `apps/frontend/Dockerfile` builds the Vite bundle and serves it via nginx (copies `/dist` → `/usr/share/nginx/html`) with SPA fallback (`try_files $uri $uri/ /index.html`). Exposes port 80.
 - Override `VITE_BACKEND_URL` / `VITE_BACKEND_WS_URL` via build args or env vars when targeting staging clusters.
 
 ## CI/CD

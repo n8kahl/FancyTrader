@@ -4,40 +4,39 @@
 
 | Component | Default port | Entrypoint |
 |-----------|--------------|------------|
-| Backend (Express) | 3001 (set `PORT`) | `pnpm --filter @fancytrader/backend start` |
-| Frontend (Vite)   | 5173              | `pnpm --filter @fancytrader/frontend dev` |
+| Backend (Express) | 3001 (`PORT`) | `pnpm --filter @fancytrader/backend start` |
+| Frontend (Nginx)  | 80 | Nginx serving `/usr/share/nginx/html` |
+| Worker (metrics)  | 9100 (`WORKER_METRICS_PORT`) | `pnpm --filter @fancytrader/worker start:loop` |
 
 - `pnpm dev` runs backend + frontend in parallel for local development.
 - `docker compose up --build` launches both images defined in the repo. The frontend image serves the static build behind nginx; the backend image runs `node apps/backend/dist/index.js`.
 
 ## Environment variables
 
-Backend (`.env` / `.env.example`):
+### Canonical project-wide variables (set in Railway Project Variables)
 
-- `PORT` (default 8080, docker-compose sets 3001)
-- `POLYGON_API_KEY`, `POLYGON_WS_CLUSTER`, `POLYGON_WS_BASE`, `POLYGON_FALLBACK_WS_BASE`
-- `STREAMING_ENABLED` (set `false` on follower replicas so only one instance owns the Polygon stream)
-- `FEATURE_ENABLE_POLYGON_STREAM`, `FEATURE_POLYGON_BACKOFF_ON_MAX`, `FEATURE_POLYGON_MAX_SLEEP_MS`, `FEATURE_ENABLE_MOCK_STREAM`
-- `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
-- `DISCORD_WEBHOOK_URL`
-- `FRONTEND_ORIGINS` or `CORS_ALLOWLIST` (comma separated)
+`NODE_ENV`, `TRUST_PROXY`, `LOG_LEVEL`, `REQUEST_BODY_LIMIT`, `CORS_ALLOWLIST`, `MASSIVE_API_KEY`, `MASSIVE_BASE_URL`, `MASSIVE_WS_BASE`, `MASSIVE_WS_CLUSTER`, `FEATURE_ENABLE_MASSIVE_STREAM`, `FEATURE_MOCK_MODE`, `WS_MAX_PAYLOAD_BYTES`, `WS_HEARTBEAT_INTERVAL_MS`, `WS_IDLE_CLOSE_MS`, `WS_RECONNECT_MAX_ATTEMPTS`, `WS_RECONNECT_BASE_MS`, `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_WRITE_MAX`, `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY`, `DISCORD_ENABLED`, `DISCORD_WEBHOOK_URL`, `ADMIN_KEY`, `MIN_INSTANCES`, `MAX_INSTANCES`
 
-Frontend (`.env`, `.env.test`):
+### Per-service overrides
 
-- `VITE_BACKEND_URL`, `VITE_BACKEND_WS_URL` (defaults point to hosted API; override for docker or staging)
+- Backend: `PORT=3001`
+- Frontend: `VITE_BACKEND_URL`, `VITE_BACKEND_WS_URL`, `VITE_DEMO_USER_ID`
+- Worker: `WORKER_SYMBOLS`, `WORKER_METRICS_PORT`
 
-Tests load `.env.test` files automatically so secrets never leak into CI.
+> Deprecated: `ALLOWED_WS_ORIGINS`, `CORS_ORIGINS`, `FRONTEND_ORIGINS`, `RATE_ENABLED`, `RATE_MAX`, `RATE_WINDOW_MS`.
+
+Frontend-specific env (e.g., `VITE_BACKEND_URL`) live in `apps/frontend/src/utils/env.ts` and can be sourced from `.env`/`.env.local` per Vite conventions.
 
 ## Health & readiness
 
 - `GET /healthz` returns `{ ok, version, uptimeSec }`.
-- `GET /readyz` now includes the latest `SERVICE_STATE`. When `FEATURE_ENABLE_POLYGON_STREAM=true` and Polygon returns `max_connections`, readiness flips to `false` and the UI shows a "provider limit" banner.
-- `GET /metrics` exposes the in-memory counters from `utils/metrics` (protect behind auth before exposing publicly).
+- `GET /readyz` tracks Massive readiness (`SERVICE_STATE`), `lastMessageAt`, and stream freshness; `FEATURE_ENABLE_MASSIVE_STREAM=true` requires `MASSIVE_API_KEY`.
+- `GET /metrics` exposes Prometheus counters (`utils/metrics`) and is protected by `x-admin-key: $ADMIN_KEY`.
 
 ## Middleware / CORS
 
 - Helmet, compression, JSON/urlencoded parsers, request logging, and metrics middleware are installed in `createApp` before any router.
-- CORS allowlist is composed of `FRONTEND_ORIGINS` + defaults (`https://fancy-trader.vercel.app`, `http://localhost:5173`) plus a regex for preview deploys. `CORS_ALLOWLIST` works as a shorthand for CLI usage.
+- Both HTTP and WS guards reference the same `CORS_ALLOWLIST` (comma-separated); preview deploys matching `https://fancy-trader-*.vercel.app` are allowed automatically.
 
 ## Rate limits & upstream safety
 

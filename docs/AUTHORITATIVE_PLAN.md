@@ -86,6 +86,12 @@ An AI “Trading Coach” that generates deterministic, risk-aware trade plans w
 
 ---
 
+## Status sync (2025-11-11)
+- ✅ Sprint 0 groundwork: backend & worker running, health + readyz working, Massive handshake logged, frontend builds + shared contracts wired.
+- 🔧 Frontend 404 => fixed by copying `apps/frontend/dist` into nginx + verifying SPA fallback (`try_files $uri $uri/ /index.html`).
+- 🔄 Deprecated envs retired: `ALLOWED_WS_ORIGINS`, `CORS_ORIGINS`, `FRONTEND_ORIGINS`, `RATE_ENABLED`, `RATE_MAX`, `RATE_WINDOW_MS`.
+- 📦 Documented canonical env list and release checklist across `.env.example`, `docs/OPERATIONS.md`, `README.md`.
+
 ## Environments (authoritative)
 - `MASSIVE_API_KEY`, `MASSIVE_BASE_URL`, `MASSIVE_WS_BASE`, `MASSIVE_WS_CLUSTER`
 - `FEATURE_ENABLE_MASSIVE_STREAM=true`
