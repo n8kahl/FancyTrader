@@ -1,7 +1,6 @@
 import type { ConfidenceBreakdown } from "@fancytrader/shared";
-import type { PolygonServiceState } from "../services/polygonStreamingService.js";
 
-// Market Data Types
+/** ===== Market Data ===== */
 export interface Bar {
   symbol: string;
   timestamp: number;
@@ -29,7 +28,7 @@ export interface Trade {
   size: number;
 }
 
-// Technical Indicator Types
+/** ===== Indicators ===== */
 export interface TechnicalIndicators {
   ema9?: number;
   ema21?: number;
@@ -40,7 +39,7 @@ export interface TechnicalIndicators {
   atr?: number;
 }
 
-// Setup Detection Types
+/** ===== Setup Detection ===== */
 export type SetupType =
   | "ORB_PC"
   | "EMA_BOUNCE"
@@ -88,7 +87,7 @@ export interface DetectedSetup {
   lastUpdate: number;
 }
 
-// Options Types
+/** ===== Options ===== */
 export interface OptionsContract {
   symbol: string;
   underlying: string;
@@ -109,7 +108,7 @@ export interface OptionsContract {
   timestamp: number;
 }
 
-// Discord Alert Types
+/** ===== Alerts ===== */
 export type AlertType =
   | "SETUP_ALERT"
   | "ENTRY_ALERT"
@@ -130,7 +129,7 @@ export interface DiscordAlert {
   timestamp: number;
 }
 
-// WebSocket Message Types
+/** ===== WebSocket ===== */
 export type WSMessageType =
   | "SUBSCRIBE"
   | "UNSUBSCRIBE"
@@ -148,7 +147,7 @@ export type WSMessagePayload =
   | { status?: string; message?: string; symbols?: string[] }
   | { error: string; code?: string }
   | { setups?: DetectedSetup[]; action?: string; [key: string]: unknown }
-  | PolygonServiceState
+  | { provider?: "massive"; state?: Record<string, unknown> }
   | Record<string, unknown>;
 
 export interface WSMessage {
@@ -157,7 +156,7 @@ export interface WSMessage {
   timestamp?: number;
 }
 
-// Watchlist Types
+/** ===== Watchlist ===== */
 export interface WatchlistSymbol {
   symbol: string;
   name?: string;
@@ -166,7 +165,7 @@ export interface WatchlistSymbol {
   addedAt: number;
 }
 
-// Strategy Configuration
+/** ===== Strategy Config ===== */
 export interface StrategyConfig {
   id: string;
   name: string;
@@ -176,4 +175,5 @@ export interface StrategyConfig {
   minConfluence: number;
 }
 
-export type UpstreamProvider = "polygon" | "massive";
+/** Upstream provider tag (Polygon removed) */
+export type UpstreamProvider = "massive";
