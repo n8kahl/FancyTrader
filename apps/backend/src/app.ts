@@ -15,10 +15,14 @@ import { AlertRegistry } from "./alerts/registry.js";
 import { defaultStrategyParams } from "./config/strategy.defaults.js";
 import { errorHandler } from "./middleware/error.js";
 import { alertLimiter, shareLimiter } from "./middleware/rateLimit.js";
+import { requestId } from "./middleware/requestId.js";
+import { serverEnv } from "@fancytrader/shared";
+import { featureFlags } from "./config/features.js";
 import pino from "pino";
 
 const log = pino({ name: "app" });
-const defaultAllowedOrigins = ["https://fancy-trader.vercel.app", "http://localhost:5173"];
+const defaultAllowedOrigins =
+  serverEnv.CORS_ALLOWLIST.split(",").map((value) => value.trim()).filter(Boolean);
 const corsAllowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 const corsAllowedHeaders = [
   "Content-Type",
@@ -52,11 +56,10 @@ function getRoutePath(req: Request): string {
 }
 
 function computeAllowedOrigins(): string[] {
-  const envAllowedOrigins = (process.env.CORS_ALLOWLIST || process.env.FRONTEND_ORIGINS || "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
-  return Array.from(new Set([...envAllowedOrigins, ...defaultAllowedOrigins]));
+  if (defaultAllowedOrigins.length > 0) {
+    return defaultAllowedOrigins;
+  }
+  return ["https://fancy-trader.vercel.app", "http://localhost:5173"];
 }
 
 function isPreviewOrigin(origin: string): boolean {
@@ -132,8 +135,12 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
   };
 
   const app = express();
+  if (serverEnv.TRUST_PROXY) {
+    app.set("trust proxy", 1);
+  }
 
   app.use(helmet());
+  app.use(requestId());
   app.use(compression());
 
   const corsOptions: cors.CorsOptions = {
@@ -162,9 +169,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
     next();
   });
 
-  const bodyLimit = process.env.REQUEST_BODY_LIMIT || "1mb";
-  app.use(express.json({ limit: bodyLimit }));
-  app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
+  app.use(express.json({ limit: serverEnv.REQUEST_BODY_LIMIT }));
+  app.use(express.urlencoded({ extended: true, limit: serverEnv.REQUEST_BODY_LIMIT }));
 
   app.use((req, _res, next) => {
     logger.info(`${req.method} ${req.path}`);
@@ -212,8 +218,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
   app.use(errorHandler);
 
   const STREAMING_ENABLED = process.env.STREAMING_ENABLED === "true";
-  const ENABLE_POLYGON = process.env.FEATURE_ENABLE_POLYGON_STREAM === "true";
-  const ENABLE_MASSIVE = process.env.FEATURE_ENABLE_MASSIVE_STREAM === "true";
+  const ENABLE_POLYGON = featureFlags.enablePolygonStream;
+  const ENABLE_MASSIVE = featureFlags.enableMassiveStream;
 
   log.info({ STREAMING_ENABLED, ENABLE_POLYGON, ENABLE_MASSIVE }, "Streaming flags");
 
@@ -233,14 +239,14 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
       };
       log.info("Polygon streaming enabled");
     } else if (ENABLE_MASSIVE) {
-      const key = process.env.MASSIVE_API_KEY;
+      const key = serverEnv.MASSIVE_API_KEY;
       if (!key) {
         throw new Error("MASSIVE_API_KEY required when FEATURE_ENABLE_MASSIVE_STREAM=true");
       }
       const { MassiveStreamingService } = await import("./services/massiveStreamingService.js");
       const massive = new MassiveStreamingService({
-        baseUrl: process.env.MASSIVE_WS_BASE || "wss://socket.massive.com",
-        cluster: process.env.MASSIVE_WS_CLUSTER || "options",
+        baseUrl: serverEnv.MASSIVE_WS_BASE,
+        cluster: serverEnv.MASSIVE_WS_CLUSTER,
         apiKey: key,
         subscriptions: [],
         logger: (event, meta) => logger.debug("massive_ws", { event, ...meta }),

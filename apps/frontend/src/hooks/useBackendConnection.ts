@@ -1,39 +1,118 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { getBackendWsUrl } from "../utils/env";
-import { createWebSocketClient } from "../services/websocketClient";
+import { useEffect, useMemo, useState } from "react";
+import { createWebSocketClient, type WSMessage } from "../services/websocketClient";
+import { getBackendConnectionDeps } from "./backendConnectionDeps";
+
+/** Exported for ConnectionStatus component props */
+export type ConnectionBannerState =
+  | "healthy"
+  | "degraded"
+  | "offline"
+  | "error"
+  | "closed"
+  | "connecting";
+
+/** Reuse the deps type without re-declaring it */
+export type BackendConnectionDependencies =
+  import("./backendConnectionDeps").BackendConnectionDependencies;
+
+function computeBanner(
+  connected: boolean,
+  last: WSMessage | null
+): { state: ConnectionBannerState; reason?: string } {
+  let state: ConnectionBannerState = connected ? "healthy" : "connecting";
+  let reason: string | undefined;
+
+  if (last?.type === "SERVICE_STATE") {
+    const s = (last as any)?.payload?.status;
+    if (s === "offline") {
+      state = "offline";
+      reason = "Data provider offline";
+    } else if (s === "healthy") {
+      state = connected ? "healthy" : "connecting";
+    }
+  }
+
+  if (last?.type === "error") {
+    state = "error";
+    reason = (last as any)?.message || "Unknown error";
+  }
+
+  return { state, reason };
+}
+
+const deps = getBackendConnectionDeps();
 
 export function useBackendConnection() {
   const [connected, setConnected] = useState(false);
+  const [lastMessage, setLastMessage] = useState<WSMessage | null>(null);
   const [subscriptions, setSubscriptions] = useState<string[]>([]);
-  const [lastMessage, setLastMessage] = useState<any>(null);
 
-  const client = useMemo(() => createWebSocketClient(getBackendWsUrl()), []);
-  const unsubRef = useRef<() => void>();
+  const client = useMemo(() => createWebSocketClient(deps.wsClient.getConnectionState() ? undefined : deps.wsClient), [deps.wsClient]);
 
   useEffect(() => {
     client.connect();
 
-    unsubRef.current = client.onMessage((msg) => {
+    const offMsg = client.onMessage((msg) => {
       setLastMessage(msg);
-
-      if (msg?.type === "SUBSCRIPTIONS" && Array.isArray(msg.symbols)) {
-        setSubscriptions(msg.symbols);
-      }
-
-      if (msg?.type === "status" || msg?.type === "STATUS") {
-        setConnected(true);
+      if (msg?.type === "status") {
+        const ok = Array.isArray((msg as any).payload)
+          ? (msg as any).payload.some((p: any) => p?.status === "connected")
+          : false;
+        if (ok) setConnected(true);
       }
     });
 
+    const offState = client.onStateChange((st) => {
+      if (st === "connected") setConnected(true);
+      if (st === "disconnected") setConnected(false);
+    });
+
+    const offErr = client.onError(() => {});
+
     return () => {
-      unsubRef.current?.();
+      offMsg();
+      offState();
+      offErr();
       client.close();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [client]);
 
-  const subscribe = (symbols: string[]) => client.subscribe(symbols);
-  const unsubscribe = (symbols: string[]) => client.unsubscribe(symbols);
+  const subscribe = (symbols: string[]) => {
+    client.subscribe(symbols);
+    setSubscriptions((prev) => Array.from(new Set([...prev, ...symbols])));
+  };
 
-  return { connected, subscriptions, lastMessage, subscribe, unsubscribe };
+  const unsubscribe = (symbols: string[]) => {
+    client.unsubscribe(symbols);
+    setSubscriptions((prev) => prev.filter((s) => !symbols.includes(s)));
+  };
+
+  const manualReconnect: (..._args: any[]) => void = () => {
+    client.disconnect();
+    client.connect();
+  };
+
+  const banner = computeBanner(connected, lastMessage);
+
+  return {
+    connected,
+    lastMessage,
+    subscriptions,
+    subscribe,
+    unsubscribe,
+    isConnected: connected,
+    isLoading: false,
+    error: undefined as unknown as Error | undefined,
+    trades: [] as any[],
+    subscribeToSymbols: subscribe,
+    unsubscribeFromSymbols: unsubscribe,
+    connectionStatus: banner.state,
+    connectionReason: banner.reason ?? null,
+    manualReconnect,
+  };
+}
+
+export function useConnectionStatus(_skipRealtime?: boolean, _deps?: BackendConnectionDependencies) {
+  const { connectionStatus, connectionReason, manualReconnect } = useBackendConnection();
+  return { connectionStatus, connectionReason, manualReconnect };
 }

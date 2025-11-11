@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { MassiveClient, marketToMode } from "@fancytrader/shared";
+import { MassiveClient, marketToMode, serverEnv } from "@fancytrader/shared";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { snapshotIndices } from "./clients/massive.js";
 import {
@@ -10,6 +10,8 @@ import {
   scanSuccess,
   startMetricsServer,
 } from "./lib/metrics.js";
+import { sendDiscordAlert } from "./lib/discord.js";
+import { persistSnapshots } from "./jobs/snapshotPersist.js";
 
 type ScanMode = ReturnType<typeof marketToMode>;
 type ScanStatus = "pending" | "running" | "success" | "failed";
@@ -26,8 +28,8 @@ const lastSnapshots = new Map<string, unknown>();
 
 const getSupabaseClient = (): SupabaseClient => {
   if (supabase) return supabase;
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
+  const url = serverEnv.SUPABASE_URL;
+  const key = serverEnv.SUPABASE_SERVICE_KEY;
   if (!url || !key) {
     throw new Error("SUPABASE_URL and SUPABASE_SERVICE_KEY are required for the worker");
   }
@@ -123,7 +125,25 @@ export async function main(): Promise<void> {
     startMetricsServer(metricsPort);
   }
   const mode = await resolveCurrentMode();
+  await sendDiscordAlert({
+    enabled: serverEnv.DISCORD_ENABLED,
+    url: serverEnv.DISCORD_WEBHOOK_URL,
+    kind: "SESSION_TRANSITION",
+    title: "Market session detected",
+    fields: { mode },
+  });
   await scanLoop(mode);
+
+  if (mode === "closed" || mode === "premarket") {
+    const wrote = await persistSnapshots(WATCH_SYMBOLS);
+    await sendDiscordAlert({
+      enabled: serverEnv.DISCORD_ENABLED,
+      url: serverEnv.DISCORD_WEBHOOK_URL,
+      kind: "SCANNER_HEALTH",
+      title: "Snapshots persisted",
+      fields: { symbols: WATCH_SYMBOLS.length, rows: wrote, mode },
+    });
+  }
 }
 
 export const __setMassiveClientForTests = (client: MassiveClient): void => {
@@ -141,7 +161,14 @@ export const __resetSupabaseClientForTests = (): void => {
 const isDirectRun =
   process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
 if (isDirectRun) {
-  main().catch((error) => {
+  main().catch(async (error) => {
+    await sendDiscordAlert({
+      enabled: serverEnv.DISCORD_ENABLED,
+      url: serverEnv.DISCORD_WEBHOOK_URL,
+      kind: "ERROR",
+      title: "Worker scan failed",
+      fields: { message: error instanceof Error ? error.message : String(error) },
+    });
     console.error("Worker failed", error);
     process.exit(1);
   });

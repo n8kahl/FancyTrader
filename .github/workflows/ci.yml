@@ -15,6 +15,20 @@ jobs:
           node-version: '20'
           cache: 'pnpm'
       - run: pnpm i --frozen-lockfile
+      - name: pnpm audit (prod)
+        run: pnpm audit --prod || true
+      - name: Env guard (backend)
+        run: |
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            missing=()
+            for k in MASSIVE_API_KEY ADMIN_KEY; do
+              [ -z "${!k}" ] && missing+=("$k")
+            done
+            if [ "${#missing[@]}" -gt 0 ]; then
+              echo "::error title=Missing envs::${missing[*]}"
+              exit 1
+            fi
+          fi
       - run: pnpm -r lint
       - run: pnpm -r typecheck
       - run: pnpm -r test -- --coverage

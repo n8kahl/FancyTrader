@@ -1,70 +1,43 @@
 import React from "react";
-import type { ConnectionBannerState } from "../hooks/useBackendConnection";
+import { useConnectionStatus } from "../hooks";
+import type { ConnectionStatus as ConnState } from "../hooks/useBackendConnection";
 
-export type ConnectionState = ConnectionBannerState;
-
-function bgFor(state: ConnectionState) {
-  switch (state) {
-    case "healthy":
-      return "bg-emerald-500";
-    case "degraded":
-      return "bg-amber-500";
-    case "offline":
-    case "error":
-      return "bg-rose-600";
-    case "closed":
-      return "bg-zinc-500";
-    case "connecting":
-    default:
-      return "bg-sky-500";
-  }
-}
-
-function labelFor(state: ConnectionState) {
-  switch (state) {
-    case "healthy":
-      return "Healthy";
-    case "degraded":
-      return "Degraded";
-    case "offline":
-      return "Offline";
-    case "error":
-      return "Error";
-    case "closed":
-      return "Closed";
-    case "connecting":
-    default:
-      return "Connecting…";
-  }
-}
-
-export function ConnectionStatus(props: {
-  state: ConnectionState;
+type Props = {
+  state?: ConnState;
   reason?: string | null;
-  onRetry?: () => void;
-}) {
-  const { state, reason, onRetry } = props;
-  const show = import.meta.env.VITE_STATUS_BANNER !== "0";
-  if (!show) return null;
+  isLoading?: boolean;
+  isConnected?: boolean;
+  error?: string | null;
+  onReconnect?: () => void;
+};
 
-  const showRetry = state === "offline" || state === "error" || state === "closed";
+export function ConnectionStatus(props: Props) {
+  const hook = useConnectionStatus();
+
+  const isConnected = props.isConnected ?? hook.isConnected;
+  const isLoading = props.isLoading ?? hook.isLoading;
+  const error = props.error ?? hook.error;
+  const connectionStatus = props.state ?? hook.connectionStatus;
+  const connectionReason = props.reason ?? hook.connectionReason;
+  const manualReconnect = props.onReconnect ?? hook.manualReconnect;
 
   return (
-    <div className={`w-full ${bgFor(state)} text-white text-sm`} data-testid="connection-status-banner">
-      <div className="mx-auto max-w-6xl px-3 py-1.5 flex items-center gap-2">
-        <span className="font-medium">{labelFor(state)}</span>
-        {reason ? <span className="opacity-80">— {reason}</span> : null}
-        {showRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="ml-auto rounded-md bg-white/20 px-2 py-0.5 hover:bg-white/25 focus:outline-none"
-            aria-label="Reconnect"
-          >
-            Reconnect
-          </button>
-        )}
-      </div>
+    <div className="flex items-center gap-2 text-sm">
+      <span className="font-medium">Status:</span>
+      <span>{connectionStatus}</span>
+      {connectionReason ? <span className="text-zinc-500">– {connectionReason}</span> : null}
+      {isLoading ? <span className="text-zinc-500">(connecting)</span> : null}
+      {!isLoading && !isConnected ? (
+        <button
+          className="ml-2 rounded px-2 py-1 border border-zinc-300 hover:bg-zinc-100"
+          onClick={manualReconnect}
+        >
+          Reconnect
+        </button>
+      ) : null}
+      {error ? <span className="ml-2 text-red-600">Error: {error}</span> : null}
     </div>
   );
 }
+
+export default ConnectionStatus;

@@ -1,4 +1,4 @@
-import { ConnectionStatus } from "./components/ConnectionStatus";
+import ConnectionStatus from "./components/ConnectionStatus";
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { TradeCard } from "./components/TradeCard";
@@ -48,7 +48,7 @@ import {
   type PositionTracking,
 } from "./types/options";
 import { generateMockTrades } from "./utils/mockTradeGenerator";
-import { useBackendConnection } from "./hooks/useBackendConnection";
+import useBackendConnection from "./hooks/useBackendConnection";
 import { displayWelcomeMessage } from "./utils/welcomeMessage";
 import { logger } from "./utils/logger";
 import { getMode, isDev, getBackendUrl, getBackendWsUrl } from "./utils/env";
