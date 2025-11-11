@@ -1,4 +1,4 @@
-import { ConnectionStatus } from "./components/ConnectionStatus";
+import ConnectionStatus from "./components/ConnectionStatus";
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { TradeCard } from "./components/TradeCard";
