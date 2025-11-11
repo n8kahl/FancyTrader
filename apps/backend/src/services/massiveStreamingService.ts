@@ -1,5 +1,6 @@
 import EventEmitter from "events";
 import WebSocket from "ws";
+import { serverEnv } from "@fancytrader/shared/server";
 import { logger } from "../utils/logger.js";
 
 export type MassiveStreamingOptions = {
@@ -8,6 +9,8 @@ export type MassiveStreamingOptions = {
   cluster?: string;
   subscriptions?: string[];
   logger?: (event: string, meta?: Record<string, unknown>) => void;
+  serializeSubscribe?: (channels: string[]) => unknown;
+  serializeUnsubscribe?: (channels: string[]) => unknown;
 };
 
 const log = (event: string, meta?: Record<string, unknown>) => logger.info("massive_ws", { event, ...meta });
@@ -64,14 +67,14 @@ export class MassiveStreamingService extends EventEmitter {
   subscribe(channel: string): void {
     if (!this.subs.includes(channel)) this.subs.push(channel);
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.send({ action: "subscribe", params: channel });
+      this.sendSubscribe([channel]);
     }
   }
 
   unsubscribe(channel: string): void {
     this.subs = this.subs.filter((sub) => sub !== channel);
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.send({ action: "unsubscribe", params: channel });
+      this.sendUnsubscribe([channel]);
     }
   }
 
@@ -88,22 +91,40 @@ export class MassiveStreamingService extends EventEmitter {
       this.options.cluster,
       this.options.apiKey
     );
-    this.logFn("ws_connecting", { url: wsUrl });
+    const safeUrl = (() => {
+      try {
+        const u = new URL(wsUrl);
+        if (u.searchParams.has("apiKey")) {
+          const raw = u.searchParams.get("apiKey") ?? "";
+          const masked = raw.length > 6 ? `${raw.slice(0, 3)}***${raw.slice(-3)}` : "***";
+          u.searchParams.set("apiKey", masked);
+        }
+        return u.toString();
+      } catch {
+        return "wss://<redacted>";
+      }
+    })();
+
+    this.logFn("ws_connecting", { url: safeUrl });
     logger.info(
       "massive_ws",
       {
         event: "ws_url_computed",
         MASSIVE_WS_BASE: this.options.baseUrl,
         MASSIVE_WS_CLUSTER: this.options.cluster,
-        wsUrl,
+        wsUrl: safeUrl,
       }
     );
-    this.ws = new WebSocket(wsUrl);
+    this.ws = new WebSocket(wsUrl, {
+      perMessageDeflate: false,
+      maxPayload: serverEnv.WS_MAX_PAYLOAD_BYTES,
+    });
 
-    this.ws.on("open", () => this.handleOpen(wsUrl));
+    this.ws.on("open", () => this.handleOpen(safeUrl));
     this.ws.on("message", (buf) => this.handleMessage(buf));
     this.ws.on("close", (code) => this.handleClose(code));
     this.ws.on("error", (err) => this.handleError(err as Error));
+    this.ws.on("pong", () => this.touchHeartbeat());
   }
 
   private handleOpen(url: string): void {
@@ -149,7 +170,7 @@ export class MassiveStreamingService extends EventEmitter {
 
   private flushSubscriptions(): void {
     if (!this.subs.length || this.ws?.readyState !== WebSocket.OPEN) return;
-    this.send({ action: "subscribe", params: this.subs.join(",") });
+    this.sendSubscribe(this.subs);
   }
 
   private startHeartbeat(): void {
@@ -160,20 +181,19 @@ export class MassiveStreamingService extends EventEmitter {
     this.ws?.off?.("pong", onPong);
     this.ws?.on?.("pong", onPong);
 
+    const interval = serverEnv.WS_HEARTBEAT_INTERVAL_MS;
     const ping = () => {
       if (this.ws?.readyState !== WebSocket.OPEN) return;
       try {
-        // ws ping frame
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.ws as any).ping();
+        (this.ws as any).ping?.();
       } catch (error) {
         this.logFn("ws_ping_error", { error: String(error) });
       }
-      this.scheduleHeartbeatTimeout();
+      this.scheduleHeartbeatTimeout(interval);
     };
 
     ping();
-    this.heartbeat = setInterval(ping, 15_000);
+    this.heartbeat = setInterval(ping, interval);
   }
 
   private touchHeartbeat(): void {
@@ -183,8 +203,9 @@ export class MassiveStreamingService extends EventEmitter {
     }
   }
 
-  private scheduleHeartbeatTimeout(): void {
+  private scheduleHeartbeatTimeout(intervalMs: number): void {
     if (this.heartbeatTimeout) clearTimeout(this.heartbeatTimeout);
+    const timeoutMs = Math.max(5_000, Math.floor(intervalMs * 0.9));
     this.heartbeatTimeout = setTimeout(() => {
       this.logFn("ws_heartbeat_missed");
       try {
@@ -192,13 +213,16 @@ export class MassiveStreamingService extends EventEmitter {
       } catch {
         /* ignore */
       }
-    }, 10_000);
+    }, timeoutMs);
   }
 
   private scheduleReconnect(): void {
     const jitter = Math.random() * 100;
     const wait = Math.min(this.backoff + jitter, 5_000);
     this.logFn("ws_reconnect_scheduled", { wait });
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
     this.reconnectTimer = setTimeout(() => {
       this.backoff = Math.min(this.backoff * 2, 5_000);
       this.connect();
@@ -212,5 +236,21 @@ export class MassiveStreamingService extends EventEmitter {
     } catch (error) {
       this.logFn("ws_send_error", { error: String(error) });
     }
+  }
+
+  private sendSubscribe(channels: string[]): void {
+    const payload =
+      typeof this.options.serializeSubscribe === "function"
+        ? this.options.serializeSubscribe(channels)
+        : { action: "subscribe", params: channels.join(",") };
+    this.send(payload as Record<string, unknown>);
+  }
+
+  private sendUnsubscribe(channels: string[]): void {
+    const payload =
+      typeof this.options.serializeUnsubscribe === "function"
+        ? this.options.serializeUnsubscribe(channels)
+        : { action: "unsubscribe", params: channels.join(",") };
+    this.send(payload as Record<string, unknown>);
   }
 }
