@@ -9,7 +9,7 @@ import { defaultStrategyParams } from "../src/config/strategy.defaults";
 import type { SupabaseService } from "../src/services/supabaseService";
 import type { SupabaseSetupsService } from "../src/services/supabaseSetups";
 import type { StrategyDetectorService } from "../src/services/strategyDetector";
-import { PolygonClient } from "../src/services/polygonClient";
+import { PolygonClient } from "../src/services/massiveClient";
 
 const buildMockServices = (): AppServices => {
   const supabaseService = {

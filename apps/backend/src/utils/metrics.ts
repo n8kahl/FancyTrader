@@ -47,12 +47,14 @@ export function onWsDisconnect(): void {
   metrics.ws.connected = Math.max(0, metrics.ws.connected - 1);
 }
 
-export function incPolygonRest(ok: boolean, status?: number): void {
+export function incMassiveRest(ok: boolean, status?: number): void {
   metrics.polygon.restCalls += 1;
   if (!ok || status === 429) {
     metrics.polygon.rest429 += 1;
   }
 }
+
+export const incPolygonRest = incMassiveRest;
 
 export function incPolygonWsMessages(count = 1): void {
   metrics.polygon.wsMessages += count;

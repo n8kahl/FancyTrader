@@ -40,15 +40,15 @@ Frontend-specific env (e.g., `VITE_BACKEND_URL`) live in `apps/frontend/src/util
 
 ## Rate limits & upstream safety
 
-- Polygon REST calls are wrapped with `followNextUrls` for safe pagination, `nock` stubs cover tests.
+- Massive REST calls are wrapped with `followNextUrls` for safe pagination, `nock` stubs cover tests.
 - The WebSocket handler tracks idle clients and unsubscribes symbols when the last subscriber disconnects.
 - Alert polling cadence is controlled via watchlist size and can be tuned inside `alerts/evaluator`.
-- Only a single process should have `STREAMING_ENABLED=true` **and** `FEATURE_ENABLE_POLYGON_STREAM=true`. Preview builds or worker replicas should flip `STREAMING_ENABLED` off to avoid Polygon's `max_connections` limit. When the limit is hit, the backend delays reconnects for `FEATURE_POLYGON_MAX_SLEEP_MS` (default 15 min).
+- Only a single process should have `STREAMING_ENABLED=true` **and** `FEATURE_ENABLE_MASSIVE_STREAM=true`. Preview builds or worker replicas should flip `STREAMING_ENABLED` off to avoid Massive's `max_connections` limit. When the limit is hit, the backend delays reconnects for `FEATURE_POLYGON_MAX_SLEEP_MS` (default 15 min).
 
 ## Logging & diagnostics
 
 - `utils/logger.ts` (pino) logs structured messages (method, path, correlation-friendly data). In docker the output is JSON-ready for log aggregation.
-- Each request increments HTTP counters via `incHttp`. Polygon REST/WS calls also increment success/failure counters for dashboards.
+- Each request increments HTTP counters via `incHttp`. Massive REST/WS calls also increment success/failure counters for dashboards.
 - `DIAGNOSTICS_ENABLED` gate in the UI can surface mock data instructions when the backend is offline.
 
 ## Local build & Docker
@@ -66,6 +66,6 @@ Frontend-specific env (e.g., `VITE_BACKEND_URL`) live in `apps/frontend/src/util
 ## Troubleshooting checklist
 
 - Backend refuses to start -> ensure `.env` has `POLYGON_API_KEY` (or switch UI to mock mode for demos).
-- `readyz` failing -> Polygon unreachable or `globalThis.__WSS_READY__` false (WS still booting). Check logs for `Failed to connect to Polygon`.
+- `readyz` failing -> Massive unreachable or `globalThis.__WSS_READY__` false (WS still booting). Check logs for `Failed to connect to Massive`.
 - Frontend hitting wrong API -> set `VITE_BACKEND_URL` before building (Dockerfile exposes build args).
 - Watchlist mutations in tests -> use provided route stubs or toggle mock mode to avoid real network calls.

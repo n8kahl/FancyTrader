@@ -5,7 +5,7 @@ import type { StrategyParams } from "@fancytrader/shared";
 import { strategyParamsSchema } from "@fancytrader/shared";
 import { fetchAggregates, runDetectors, type BacktestConfig } from "../backtest/runner.js";
 import { bucketByWeek, computePnL } from "../backtest/metrics.js";
-import { PolygonClient } from "../services/polygonClient.js";
+import { PolygonClient } from "../services/massiveClient.js";
 import { defaultStrategyParams } from "../config/strategy.defaults.js";
 
 const runSchema = z.object({

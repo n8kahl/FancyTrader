@@ -1,5 +1,5 @@
 import { Express } from "express";
-import { PolygonClient } from "../services/polygonClient.js";
+import { PolygonClient } from "../services/massiveClient.js";
 import { MassiveClient } from "@fancytrader/shared";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import {

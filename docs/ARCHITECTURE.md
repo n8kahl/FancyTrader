@@ -4,7 +4,7 @@
 
 ```
 apps/
-  backend/   # Express REST + WebSocket, Supabase + Polygon integrations
+  backend/   # Express REST + WebSocket, Supabase + Massive integrations
   frontend/  # React + Vite dashboard
 packages/
   shared/    # zod schemas, shared contracts, env helpers
@@ -15,11 +15,11 @@ The workspace uses pnpm workspaces so every package consumes types and runtime h
 ## Backend service
 
 - **Runtime:** Node 20, Express 4, ws, pino.
-- **Bootstrap:** `createApp` wires middleware, routers, metrics and error handling. `index.ts` hosts the HTTP + WebSocket server, broadcasts alerts, and starts the Polygon streaming service. Tests can import `createApp` without binding a port.
-- **Routes:** `/api/market/*`, `/api/options/*`, `/api/watchlist/*`, `/api/backtest/*`, `/api/alerts`, `/api/share/*` etc. Every payload is validated with the shared zod schemas. `PolygonClient` owns REST calls (aggregates, snapshots, options chain) and `SupabaseService` persists setups/watchlists when Supabase creds are present.
-- **Messaging:** `setupWebSocketHandler` tracks connected clients, manages Polygon subscriptions, handles pings, and emits `SETUP_UPDATE`, `ALERT`, `SUBSCRIPTIONS`, `STATUS`, and `ERROR` payloads shaped by `wsOutboundSchema`.
-- **Schedulers:** `AlertEvaluator` polls Polygon snapshots for watched symbols and pushes `{ type: "alert" }` packets over the WebSocket broadcast helper.
-- **Observability:** `metrics.ts` tracks HTTP + Polygon counters, `/healthz` exposes uptime/build info, `/readyz` asserts Polygon reachability and WebSocket readiness.
+- **Bootstrap:** `createApp` wires middleware, routers, metrics and error handling. `index.ts` hosts the HTTP + WebSocket server, broadcasts alerts, and starts the Massive streaming service. Tests can import `createApp` without binding a port.
+- **Routes:** `/api/market/*`, `/api/options/*`, `/api/watchlist/*`, `/api/backtest/*`, `/api/alerts`, `/api/share/*` etc. Every payload is validated with the shared zod schemas. `MassiveRestClient` owns REST calls (aggregates, snapshots, options chain) and `SupabaseService` persists setups/watchlists when Supabase creds are present.
+- **Messaging:** `setupWebSocketHandler` tracks connected clients, manages Massive subscriptions, handles pings, and emits `SETUP_UPDATE`, `ALERT`, `SUBSCRIPTIONS`, `STATUS`, and `ERROR` payloads shaped by `wsOutboundSchema`.
+- **Schedulers:** `AlertEvaluator` polls Massive snapshots for watched symbols and pushes `{ type: "alert" }` packets over the WebSocket broadcast helper.
+- **Observability:** `metrics.ts` tracks HTTP + Massive counters, `/healthz` exposes uptime/build info, `/readyz` asserts Massive reachability and WebSocket readiness.
 
 ## Frontend application
 
@@ -36,13 +36,13 @@ The workspace uses pnpm workspaces so every package consumes types and runtime h
 ## Data flow
 
 1. **REST:** UI calls `apiClient.*` -> Express routes -> `PolygonClient`/`SupabaseService`. Payloads are validated on ingress and egress.
-2. **WebSockets:** `websocketClient` emits `SUBSCRIBE`/`UNSUBSCRIBE`/`PING`. The backend validates, coordinates Polygon subscriptions via `PolygonStreamingService`, and broadcasts `wsOutboundSchema` payloads back to clients.
+2. **WebSockets:** `websocketClient` emits `SUBSCRIBE`/`UNSUBSCRIBE`/`PING`. The backend validates, coordinates Massive subscriptions via `MassiveStreamingService`, and broadcasts `wsOutboundSchema` payloads back to clients.
 3. **Alerts:** `AlertEvaluator` polls stats/snapshots for watched symbols and sends `ALERT` payloads to every active WebSocket session.
-4. **Options chain:** `/api/options/chain/:symbol` follows Polygon v3 pagination and maps raw rows into the shared `OptionContract` type, which feeds components like `OptionsChain`.
+4. **Options chain:** `/api/options/chain/:symbol` follows Massive v3 pagination and maps raw rows into the shared `OptionContract` type, which feeds components like `OptionsChain`.
 
 ## External services
 
-- **Polygon.io** (Massive Advanced Options/Indices plans) for REST + streaming data. REST calls are stubbed with `nock` in tests and the streaming service is mocked in `ws.handler.test.ts`.
+- **Massive.com** (Advanced Options/Indices plans) for REST + streaming data. REST calls are stubbed with `nock` in tests and the streaming service is mocked in `ws.handler.test.ts`.
 - **Supabase** (optional) for setups/watchlist persistence. When env vars are missing the service degrades gracefully while keeping the same API contract.
 
 This architecture keeps validation in one place, allows the API and UI to evolve independently, and makes reuse of shared contracts straightforward in tools, tests, or CLIs.

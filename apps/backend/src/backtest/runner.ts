@@ -1,5 +1,5 @@
 import type { Bar } from "../types/index.js";
-import type { PolygonClient } from "../services/polygonClient.js";
+import type { PolygonClient } from "../services/massiveClient.js";
 import type { StrategyParams } from "@fancytrader/shared";
 import { defaultStrategyParams } from "../config/strategy.defaults.js";
 

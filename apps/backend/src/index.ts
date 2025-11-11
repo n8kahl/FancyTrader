@@ -3,7 +3,7 @@ import type { ServerOutbound } from "@fancytrader/shared";
 import { createServer } from "http";
 import { WebSocketServer } from "ws";
 import { setupWebSocketHandler } from "./websocket/handler.js";
-import { PolygonClient } from "./services/polygonClient.js";
+import { PolygonClient } from "./services/massiveClient.js";
 import { AlertEvaluator, type AlertBroadcastPayload } from "./alerts/evaluator.js";
 import { logger } from "./utils/logger.js";
 import { createApp } from "./app.js";
