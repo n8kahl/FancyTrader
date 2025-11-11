@@ -296,4 +296,5 @@ export class MassiveRestClient {
 
 const PolygonClient = MassiveRestClient;
 export { PolygonClient };
+export type PolygonClient = MassiveRestClient;
 export const massiveClient = new PolygonClient();
