@@ -66,3 +66,20 @@ export function createWebSocketClient(url: string) {
 
   return { connect, subscribe, unsubscribe, onMessage, close };
 }
+
+// --- Singleton client export for existing imports ---
+function deriveDefaultWsUrl(): string {
+  if (typeof window !== "undefined") {
+    const origin = window.location.origin.replace(/^http/, "ws");
+    return `${origin}/ws`;
+  }
+  return "wss://fancy-trader.up.railway.app/ws";
+}
+
+const WS_URL =
+  ((typeof import.meta !== "undefined" ? (import.meta as any)?.env : undefined) as any)
+    ?.VITE_BACKEND_WS_URL || deriveDefaultWsUrl();
+
+export const wsClient = createWebSocketClient(WS_URL);
+
+export type { ServerOutbound, ServerInbound } from "@fancytrader/shared";
