@@ -31,6 +31,14 @@ const boolFromEnv = (value: string | undefined, fallback: boolean): boolean => {
 const streamingEnabled = boolFromEnv(process.env.STREAMING_ENABLED, true);
 
 validateEnv();
+logger.info(
+  {
+    STREAMING_ENABLED: process.env.FEATURE_ENABLE_MASSIVE_STREAM,
+    MASSIVE_WS_BASE: serverEnv.MASSIVE_WS_BASE,
+    MASSIVE_WS_CLUSTER: serverEnv.MASSIVE_WS_CLUSTER,
+  },
+  "startup_env"
+);
 
 try {
   const { app, services, streaming } = await createApp();

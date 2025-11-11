@@ -12,6 +12,20 @@ export type MassiveStreamingOptions = {
 
 const log = (event: string, meta?: Record<string, unknown>) => logger.info("massive_ws", { event, ...meta });
 
+function buildMassiveWsUrl(baseRaw: string, clusterRaw: string | undefined, apiKey: string) {
+  const u = new URL(baseRaw);
+  const segs = u.pathname.split("/").filter(Boolean);
+  const baseEndsWithOptions = segs[segs.length - 1] === "options";
+  const cluster = (clusterRaw ?? "").trim().replace(/^\/+|\/+$/g, "");
+  const finalCluster = baseEndsWithOptions ? "" : cluster || "options";
+  const mergedPath = [u.pathname.replace(/\/+$/g, ""), finalCluster]
+    .filter(Boolean)
+    .join("/");
+  u.pathname = mergedPath || "/";
+  u.searchParams.set("apiKey", apiKey);
+  return u.toString();
+}
+
 export class MassiveStreamingService extends EventEmitter {
   private ws?: WebSocket;
   private readonly logFn: (event: string, meta?: Record<string, unknown>) => void;
@@ -64,17 +78,24 @@ export class MassiveStreamingService extends EventEmitter {
   }
 
   private connect(): void {
-    const base = this.options.baseUrl;
-    const cluster = (this.options.cluster ?? "options").trim();
-    const urlObj = new URL(base);
-    const normalizedPath = urlObj.pathname.replace(/\/+$|^$/g, "");
-    urlObj.pathname = [normalizedPath, cluster].filter(Boolean).join("/");
-    urlObj.searchParams.set("apiKey", this.options.apiKey);
-    const url = urlObj.toString();
-    this.logFn("ws_connecting", { url });
-    this.ws = new WebSocket(url);
+    const wsUrl = buildMassiveWsUrl(
+      this.options.baseUrl,
+      this.options.cluster,
+      this.options.apiKey
+    );
+    this.logFn("ws_connecting", { url: wsUrl });
+    logger.info(
+      {
+        event: "ws_url_computed",
+        MASSIVE_WS_BASE: this.options.baseUrl,
+        MASSIVE_WS_CLUSTER: this.options.cluster,
+        wsUrl,
+      },
+      "massive_ws"
+    );
+    this.ws = new WebSocket(wsUrl);
 
-    this.ws.on("open", () => this.handleOpen(url));
+    this.ws.on("open", () => this.handleOpen(wsUrl));
     this.ws.on("message", (buf) => this.handleMessage(buf));
     this.ws.on("close", (code) => this.handleClose(code));
     this.ws.on("error", (err) => this.handleError(err as Error));
