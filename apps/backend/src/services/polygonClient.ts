@@ -109,7 +109,7 @@ const mapChainRow = (row: z.infer<typeof chainRowSchema>): OptionContract => {
   };
 };
 
-export class PolygonClient {
+export class MassiveRestClient {
   private readonly http: HttpClient;
   private readonly apiKey: string;
   private readonly userAgent = DEFAULT_USER_AGENT;
@@ -132,10 +132,10 @@ export class PolygonClient {
 
   constructor() {
     this.baseUrl = process.env.MASSIVE_BASE_URL || MASSIVE_BASE_URL;
-    this.apiKey = process.env.MASSIVE_API_KEY || process.env.POLYGON_API_KEY || "";
+    this.apiKey = process.env.MASSIVE_API_KEY || "";
 
     if (!this.apiKey) {
-      throw new Error("MASSIVE_API_KEY or POLYGON_API_KEY is required");
+      throw new Error("MASSIVE_API_KEY is required");
     }
 
     this.http = new HttpClient(this.baseUrl, {
@@ -143,10 +143,10 @@ export class PolygonClient {
       headers: this.buildHeaders(),
     });
 
-    logger.info(
-      "PolygonClient configured",
-      { baseUrl: this.baseUrl, usingMassiveKey: Boolean(process.env.MASSIVE_API_KEY) }
-    );
+    logger.info("MassiveRestClient configured", {
+      baseUrl: this.baseUrl,
+      usingMassiveKey: Boolean(process.env.MASSIVE_API_KEY),
+    });
   }
 
   async getAggregates(
@@ -294,4 +294,5 @@ export class PolygonClient {
   }
 }
 
+export { MassiveRestClient as PolygonClient };
 export const massiveClient = new PolygonClient();
