@@ -30,13 +30,15 @@ export interface UseBackendConnectionReturn {
 export interface BackendConnectionDeps {
   wsUrl?: string;
 }
+/** ✅ Back-compat alias for your App.tsx */
+export type BackendConnectionDependencies = BackendConnectionDeps;
 
 /** Overloads so both zero-arg and (boolean, deps) calls are valid */
 export function useBackendConnection(): UseBackendConnectionReturn;
 export function useBackendConnection(enableLive?: boolean, deps?: BackendConnectionDeps): UseBackendConnectionReturn;
 
 /** Implementation */
-export function useBackendConnection(enableLive = true, deps: BackendConnectionDeps = {}): UseBackendConnectionReturn {
+export function useBackendConnection(enableLive: boolean = true, deps: BackendConnectionDeps = {}): UseBackendConnectionReturn {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [reason, setReason] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
