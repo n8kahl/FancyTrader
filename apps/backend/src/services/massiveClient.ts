@@ -294,5 +294,6 @@ export class MassiveRestClient {
   }
 }
 
-export { MassiveRestClient as PolygonClient };
+const PolygonClient = MassiveRestClient;
+export { PolygonClient };
 export const massiveClient = new PolygonClient();
