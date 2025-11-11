@@ -1,38 +1,44 @@
-# ---------- base ----------
-FROM node:20-alpine AS base
-ENV PNPM_HOME="/root/.local/share/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
+# --- builder stage ---
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Enable pnpm via corepack
 RUN corepack enable
 
-# ---------- builder ----------
-FROM base AS builder
-WORKDIR /app
+# Copy workspace manifests so pnpm can resolve deps without full sources
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/backend/package.json apps/backend/
 
-# Copy only workspace manifests for better caching
-COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
-COPY apps/backend/package.json apps/backend/package.json
-COPY packages/shared/package.json packages/shared/package.json
-
+# Install ALL workspace deps (hoisted)
 RUN pnpm install --frozen-lockfile
 
-# Bring in the full source and build shared + backend
+# Copy full source tree
 COPY . .
-RUN pnpm --filter ./packages/shared build \
-  && pnpm --filter ./apps/backend build
 
-# Produce a minimal runtime payload for the backend with pruned deps
-RUN pnpm --filter ./apps/backend deploy --prod /app/runtime
+# Build shared + backend
+RUN pnpm -r build
 
-# ---------- runner ----------
-FROM node:20-alpine AS runner
-ENV NODE_ENV=production
+# Prune dev deps for production
+RUN pnpm prune --prod
+
+# --- runtime stage ---
+FROM node:20-alpine AS runtime
 WORKDIR /app
 
-RUN addgroup -S nodejs && adduser -S nodeuser -G nodejs
-
-COPY --from=builder /app/runtime/ ./
-
+ENV NODE_ENV=production
 ENV PORT=3001
+
+# Copy runtime deps + built artifacts
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
+COPY --from=builder /app/apps/backend/package.json ./apps/backend/
+
 EXPOSE 3001
-USER nodeuser
-CMD ["node","dist/index.js"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://localhost:3001/readyz').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+
+CMD ["node", "apps/backend/dist/index.js"]

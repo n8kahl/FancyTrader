@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { supabaseAdmin, assertAdminClient } from "../lib/supabase.js";
+import { logger } from "../utils/logger.js";
 
 export const TradeSide = z.enum(["BUY", "SELL"]);
 export const TradeStatus = z.enum(["OPEN", "CLOSED", "CANCELLED"]);
@@ -56,12 +57,31 @@ export async function listTrades(owner: string): Promise<TradeRecord[]> {
     return (mem[owner] ?? []).sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
   const admin = requireAdmin();
-  const { data, error } = await admin
+  logger.info({ userId: owner, url: process.env.SUPABASE_URL?.slice(0, 40) + "…" }, "supabase:listTrades:start");
+  const q = admin
     .from("trades")
     .select("*")
     .eq("owner", owner)
     .order("created_at", { ascending: false });
-  if (error) throw error;
+  const { data, error } = await q;
+  if (error) {
+    logger.error(
+      {
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+        message: error.message,
+        causeCode: (error as any)?.cause?.code,
+        causeErrno: (error as any)?.cause?.errno,
+        causeSyscall: (error as any)?.cause?.syscall,
+        causeAddress: (error as any)?.cause?.address,
+        causePort: (error as any)?.cause?.port,
+      },
+      "supabase:listTrades:error"
+    );
+    throw error;
+  }
+  logger.info({ count: data?.length ?? 0 }, "supabase:listTrades:success");
   return data ?? [];
 }
 

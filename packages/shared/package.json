@@ -10,8 +10,8 @@
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsup src/index.ts --dts --format esm,cjs",
-    "dev": "tsup src/index.ts --dts --format esm,cjs --watch --sourcemap",
+    "build": "tsup src/index.ts src/env.server.ts src/env.client.ts --dts --format esm,cjs",
+    "dev": "tsup src/index.ts src/env.server.ts src/env.client.ts --dts --format esm,cjs --watch --sourcemap",
     "clean": "rimraf dist"
   },
   "dependencies": {
@@ -30,18 +30,20 @@
       "require": "./dist/index.cjs"
     },
     "./server": {
-      "types": "./src/env.server.ts",
-      "default": "./src/env.server.ts"
+      "types": "./dist/env.server.d.ts",
+      "import": "./dist/env.server.js",
+      "require": "./dist/env.server.cjs"
     },
     "./client": {
-      "types": "./src/env.client.ts",
-      "default": "./src/env.client.ts"
+      "types": "./dist/env.client.d.ts",
+      "import": "./dist/env.client.js",
+      "require": "./dist/env.client.cjs"
     }
   },
   "typesVersions": {
     "*": {
-      "server": ["src/env.server.ts"],
-      "client": ["src/env.client.ts"]
+      "server": ["dist/env.server.d.ts"],
+      "client": ["dist/env.client.d.ts"]
     }
   },
   "sideEffects": false
