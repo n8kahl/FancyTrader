@@ -1,9 +1,25 @@
 import React from "react";
 import { useConnectionStatus } from "../hooks";
+import type { ConnectionStatus as ConnState } from "../hooks/useBackendConnection";
 
-export function ConnectionStatus() {
-  const { isConnected, isLoading, error, connectionStatus, connectionReason, manualReconnect } =
-    useConnectionStatus();
+type Props = {
+  state?: ConnState;
+  reason?: string | null;
+  isLoading?: boolean;
+  isConnected?: boolean;
+  error?: string | null;
+  onReconnect?: () => void;
+};
+
+export function ConnectionStatus(props: Props) {
+  const hook = useConnectionStatus();
+
+  const isConnected = props.isConnected ?? hook.isConnected;
+  const isLoading = props.isLoading ?? hook.isLoading;
+  const error = props.error ?? hook.error;
+  const connectionStatus = props.state ?? hook.connectionStatus;
+  const connectionReason = props.reason ?? hook.connectionReason;
+  const manualReconnect = props.onReconnect ?? hook.manualReconnect;
 
   return (
     <div className="flex items-center gap-2 text-sm">

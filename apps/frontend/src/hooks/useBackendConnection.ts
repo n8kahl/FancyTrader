@@ -38,7 +38,10 @@ export function useBackendConnection(): UseBackendConnectionReturn;
 export function useBackendConnection(enableLive?: boolean, deps?: BackendConnectionDeps): UseBackendConnectionReturn;
 
 /** Implementation */
-export function useBackendConnection(enableLive: boolean = true, deps: BackendConnectionDeps = {}): UseBackendConnectionReturn {
+export function useBackendConnection(
+  enableLive: boolean = true,
+  deps: BackendConnectionDeps = {}
+): UseBackendConnectionReturn {
   const [status, setStatus] = useState<ConnectionStatus>("disconnected");
   const [reason, setReason] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -80,15 +83,21 @@ export function useBackendConnection(enableLive: boolean = true, deps: BackendCo
     }
   }, []);
 
-  const subscribeToSymbols = useCallback((symbols: string[]) => {
-    symbols.forEach((s) => subsRef.current.add(s));
-    send({ type: "SUBSCRIBE", payload: { symbols } });
-  }, [send]);
+  const subscribeToSymbols = useCallback(
+    (symbols: string[]) => {
+      symbols.forEach((s) => subsRef.current.add(s));
+      send({ type: "SUBSCRIBE", payload: { symbols } });
+    },
+    [send]
+  );
 
-  const unsubscribeFromSymbols = useCallback((symbols: string[]) => {
-    symbols.forEach((s) => subsRef.current.delete(s));
-    send({ type: "UNSUBSCRIBE", payload: { symbols } });
-  }, [send]);
+  const unsubscribeFromSymbols = useCallback(
+    (symbols: string[]) => {
+      symbols.forEach((s) => subsRef.current.delete(s));
+      send({ type: "UNSUBSCRIBE", payload: { symbols } });
+    },
+    [send]
+  );
 
   const manualReconnect = useCallback(() => {
     setReason("manual reconnect");
