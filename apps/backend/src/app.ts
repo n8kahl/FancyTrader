@@ -32,10 +32,6 @@ import { featureFlags } from "./config/features.js";
 import pino from "pino";
 
 const log = pino({ name: "app" });
-  const allowlist = serverEnv.CORS_ALLOWLIST.split(",")
-    .map((value: string) => value.trim())
-    .filter(Boolean);
-  const defaultAllowedOrigins = allowlist;
 const corsAllowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 const corsAllowedHeaders = [
   "Content-Type",
@@ -53,8 +49,6 @@ const corsExposedHeaders = [
   "Access-Control-Allow-Headers",
 ];
 
-const previewRegex = /^https:\/\/fancy-trader(-[a-z0-9-]+)?\.vercel\.app$/;
-
 type MaybeRoutedRequest = Request & { route?: { path?: string }; originalUrl?: string };
 
 function getRoutePath(req: Request): string {
@@ -69,26 +63,19 @@ function getRoutePath(req: Request): string {
 }
 
 function computeAllowedOrigins(): string[] {
-  if (defaultAllowedOrigins.length > 0) {
-    return defaultAllowedOrigins;
+  const list =
+    serverEnv.CORS_ALLOWLIST?.split(",").map((value: string) => value.trim()).filter(Boolean) ?? [];
+  if (list.length > 0) {
+    return list;
   }
-  return ["https://fancy-trader.vercel.app", "http://localhost:5173"];
-}
-
-function isPreviewOrigin(origin: string): boolean {
-  try {
-    const parsed = new URL(origin);
-    return parsed.hostname.endsWith(".vercel.app");
-  } catch {
-    return previewRegex.test(origin);
-  }
+  return ["http://localhost:4173", "http://localhost:5173", "https://fancy-trader-front.up.railway.app"];
 }
 
 function isOriginAllowed(origin: string | undefined | null, allowedOrigins: string[]): boolean {
   if (!origin) {
     return true;
   }
-  return allowedOrigins.includes(origin) || isPreviewOrigin(origin);
+  return allowedOrigins.includes(origin);
 }
 
 function resolveAllowedOrigin(origin: string | undefined | null, allowedOrigins: string[]): string {
