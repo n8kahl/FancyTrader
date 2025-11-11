@@ -31,12 +31,17 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 
-# Copy runtime deps + built artifacts
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/.pnpm ./.pnpm
+# Copy pnpm manifests + shared package so runtime pnpm install can succeed
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/backend/package.json apps/backend/
+COPY --from=builder /app/packages/shared ./packages/shared
+
+# Install production dependencies for only the backend filter
+RUN corepack enable
+RUN pnpm --filter @fancytrader/backend install --prod --frozen-lockfile
+
+# Copy built artifacts
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 
 EXPOSE 3001
 
