@@ -294,5 +294,9 @@ export class MassiveRestClient {
   }
 }
 
+// Export legacy name/value
 export { MassiveRestClient as PolygonClient };
-export const massiveClient = new PolygonClient();
+// Export type for type-only imports
+export type { MassiveRestClient as PolygonClient };
+// Instantiate local class directly.
+export const massiveClient = new MassiveRestClient();
