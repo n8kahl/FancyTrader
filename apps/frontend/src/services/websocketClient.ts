@@ -1,148 +1,151 @@
-import { BACKEND_CONFIG } from "../config/backend";
-import type { ServerOutbound } from "@fancytrader/shared";
+import { getBackendWsUrl } from "../utils/env";
 
-type SubPayload = { symbols: string[] };
+/** What other modules expect (e.g. useAlerts.ts, tests) */
+export type WSMessage = { type: string; payload?: unknown; [k: string]: unknown };
 
-export type WSOutbound =
-  | { type: "SUBSCRIBE"; payload: SubPayload }
-  | { type: "UNSUBSCRIBE"; payload: SubPayload }
-  | { type: "PING"; payload?: Record<string, never> };
+export type ConnectionState = "connecting" | "connected" | "disconnected" | "closing" | "error";
 
-type Listener = (msg: any) => void;
+type Unsubscribe = () => void;
 
-export function createWebSocketClient(url: string) {
+type Listener = (msg: WSMessage) => void;
+
+type StateListener = (state: ConnectionState) => void;
+type ErrorListener = (err: unknown) => void;
+
+export function createWebSocketClient(wsUrl?: string) {
   let ws: WebSocket | null = null;
-  let listeners: Listener[] = [];
-  let heartbeat: number | null = null;
+  let connected = false;
+  let state: ConnectionState = "disconnected";
+
+  const messageHandlers = new Set<Listener>();
+  const stateHandlers = new Set<StateListener>();
+  const errorHandlers = new Set<ErrorListener>();
+
+  let pendingSymbols = new Set<string>();
+  let backoffMs = 250;
+
+  const notifyState = (s: ConnectionState) => {
+    state = s;
+    for (const h of stateHandlers) h(s);
+  };
+
+  const resubscribeAll = () => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (pendingSymbols.size === 0) return;
+    ws.send(
+      JSON.stringify({
+        type: "SUBSCRIBE",
+        payload: { symbols: Array.from(pendingSymbols) },
+      })
+    );
+  };
 
   const connect = () => {
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    const url = wsUrl || getBackendWsUrl();
+    notifyState("connecting");
     ws = new WebSocket(url);
 
-    ws.onopen = () => {
-      send({ type: "PING", payload: {} });
-    };
+    ws.addEventListener("open", () => {
+      connected = true;
+      backoffMs = 250;
+      notifyState("connected");
+      resubscribeAll();
+    });
 
-    ws.onmessage = (evt) => {
+    ws.addEventListener("message", (ev) => {
       try {
-        const data = JSON.parse(evt.data);
-        listeners.forEach((l) => l(data));
-      } catch {
-        // ignore
+        const msg = JSON.parse(ev.data as string) as WSMessage;
+        for (const h of messageHandlers) h(msg);
+      } catch (e) {
+        // swallow malformed messages
       }
-    };
+    });
 
-    ws.onclose = () => {
-      setTimeout(connect, 1_000);
-    };
+    ws.addEventListener("error", (err) => {
+      for (const h of errorHandlers) h(err);
+      notifyState("error");
+    });
 
-    if (heartbeat) clearInterval(heartbeat);
-    heartbeat = window.setInterval(() => {
-      send({ type: "PING", payload: {} });
-    }, 25_000);
-  };
+    ws.addEventListener("close", () => {
+      connected = false;
+      notifyState("disconnected");
 
-  const send = (msg: WSOutbound) => {
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    ws.send(JSON.stringify(msg));
-  };
-
-  const subscribe = (symbols: string[]) => send({ type: "SUBSCRIBE", payload: { symbols } });
-
-  const unsubscribe = (symbols: string[]) => send({ type: "UNSUBSCRIBE", payload: { symbols } });
-
-  const onMessage = (fn: Listener) => {
-    listeners.push(fn);
-    return () => {
-      listeners = listeners.filter((l) => l !== fn);
-    };
+      setTimeout(() => {
+        backoffMs = Math.min(backoffMs * 2, 4000);
+        connect();
+      }, backoffMs);
+    });
   };
 
   const close = () => {
-    if (heartbeat) clearInterval(heartbeat);
-    heartbeat = null;
-    ws?.close();
-    ws = null;
+    if (ws) {
+      notifyState("closing");
+      ws.close();
+      ws = null;
+      connected = false;
+      notifyState("disconnected");
+    }
   };
 
-  return { connect, subscribe, unsubscribe, onMessage, close };
+  const disconnect = () => {
+    close();
+  };
+
+  const subscribe = (symbols: string[]) => {
+    for (const s of symbols) pendingSymbols.add(s);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "SUBSCRIBE", payload: { symbols } }));
+    }
+  };
+
+  const unsubscribe = (symbols: string[]) => {
+    for (const s of symbols) pendingSymbols.delete(s);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "UNSUBSCRIBE", payload: { symbols } }));
+    }
+  };
+
+  const onMessage = (handler: Listener): Unsubscribe => {
+    messageHandlers.add(handler);
+    return () => messageHandlers.delete(handler);
+  };
+
+  const onStateChange = (handler: StateListener): Unsubscribe => {
+    stateHandlers.add(handler);
+    return () => stateHandlers.delete(handler);
+  };
+
+  const onError = (handler: ErrorListener): Unsubscribe => {
+    errorHandlers.add(handler);
+    return () => errorHandlers.delete(handler);
+  };
+
+  const manualReconnect = () => {
+    disconnect();
+    connect();
+  };
+
+  const getConnectionState = () => state;
+  const getConnectionStatus = () => connected;
+
+  return {
+    connect,
+    close,
+    disconnect,
+    manualReconnect,
+    subscribe,
+    unsubscribe,
+    resubscribeAll,
+    onMessage,
+    onStateChange,
+    onError,
+    getConnectionState,
+    getConnectionStatus,
+  };
 }
 
-// --- Singleton wrapper for convenience imports and diagnostics consumers ---
-/**
- * Public message type re-exported for hooks/tests that need to narrow messages.
- * Includes server outbound messages + simple status/error frames from backend.
- */
-export type WSMessage =
-  | ServerOutbound
-  | { type: "status"; message: string }
-  | { type: "error"; message: string; code?: string }
-  | { type: "SUBSCRIPTIONS"; symbols: string[] };
-
-/**
- * Build a module-level client and decorate it with a few convenience helpers
- * expected by diagnostics and docs: onConnect, onError, getConnectionStatus, disconnect.
- */
-const _base = createWebSocketClient(BACKEND_CONFIG.wsUrl);
-
-type Unsub = () => void;
-type VoidFn = () => void;
-type ErrFn = (e: unknown) => void;
-
-let _isConnected = false;
-const _connectHandlers = new Set<VoidFn>();
-const _errorHandlers = new Set<ErrFn>();
-
-let _sawStatusMessage = false;
-const _unsubStatus = _base.onMessage((msg: WSMessage) => {
-  if (!_sawStatusMessage && msg && (msg as any).type === "status") {
-    _sawStatusMessage = true;
-    _isConnected = true;
-    for (const fn of _connectHandlers) fn();
-  }
-});
-
-const _origConnect = _base.connect.bind(_base);
-function _connect(): void {
-  try {
-    _origConnect();
-  } catch (e) {
-    for (const fn of _errorHandlers) fn(e);
-    throw e;
-  }
-}
-
-function _disconnect(): void {
-  _isConnected = false;
-  _sawStatusMessage = false;
-  _unsubStatus();
-  _base.close();
-}
-
-function _onConnect(fn: VoidFn): Unsub {
-  _connectHandlers.add(fn);
-  return () => _connectHandlers.delete(fn);
-}
-
-function _onError(fn: ErrFn): Unsub {
-  _errorHandlers.add(fn);
-  return () => _errorHandlers.delete(fn);
-}
-
-function _getConnectionStatus(): boolean {
-  return _isConnected;
-}
-
-export const wsClient = {
-  connect: _connect,
-  close: _base.close,
-  subscribeToSymbols: _base.subscribe,
-  unsubscribeFromSymbols: _base.unsubscribe,
-  onMessage: _base.onMessage,
-  disconnect: _disconnect,
-  onConnect: _onConnect,
-  onError: _onError,
-  getConnectionStatus: _getConnectionStatus,
-};
-
-export type { ServerOutbound, ServerInbound } from "@fancytrader/shared";
+export const wsClient = createWebSocketClient(getBackendWsUrl());
