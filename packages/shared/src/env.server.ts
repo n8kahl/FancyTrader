@@ -1,52 +1,62 @@
 import { z } from "zod";
 
-const schema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+const ServerEnvSchema = z
+  .object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    PORT: z.coerce.number().int().positive().default(3001),
 
-  MASSIVE_API_KEY: z.string().min(1, "MASSIVE_API_KEY is required"),
-  MASSIVE_BASE_URL: z.string().url().default("https://api.massive.com"),
-  MASSIVE_WS_BASE: z.string().url().default("wss://socket.massive.com"),
-  MASSIVE_WS_CLUSTER: z
-    .enum(["options", "indices", "stocks", "crypto", "forex"])
-    .default("options"),
-  FEATURE_ENABLE_MASSIVE_STREAM: z.coerce.boolean().default(false),
-  FEATURE_POLYGON_ENABLED: z.coerce.boolean().default(false),
-  FEATURE_MOCK_MODE: z.coerce.boolean().default(false),
+    // CORS
+    CORS_ALLOWLIST: z.string().default("http://localhost:5173,http://localhost:5174"),
 
-  CORS_ALLOWLIST: z.string().default("http://localhost:5173"),
-  REQUEST_BODY_LIMIT: z.string().default("1mb"),
+    // Trust proxy / body limits
+    TRUST_PROXY: z.coerce.boolean().default(false),
+    REQUEST_BODY_LIMIT: z.string().default("1mb"),
 
-  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60_000),
-  RATE_LIMIT_MAX: z.coerce.number().default(10),
-  RATE_LIMIT_WRITE_MAX: z.coerce.number().default(25),
+    // Massive REST + WS
+    MASSIVE_BASE_URL: z.string().url().default("https://api.massive.com"),
+    MASSIVE_SOCKET_URL: z.string().url().default("wss://socket.massive.com/options"),
 
-  WS_MAX_PAYLOAD_BYTES: z.coerce.number().default(1_000_000),
-  WS_HEARTBEAT_INTERVAL_MS: z.coerce.number().default(15_000),
-  WS_IDLE_CLOSE_MS: z.coerce.number().default(60_000),
+    // WS options used by app/index/handler
+    MASSIVE_WS_BASE: z.string().url().default("wss://socket.massive.com/options"),
+    MASSIVE_WS_CLUSTER: z.string().default("options"),
 
-  SUPABASE_URL: z.string().url().optional(),
-  SUPABASE_SERVICE_KEY: z.string().optional(),
-  SUPABASE_ANON_KEY: z.string().optional(),
+    // Feature flag to enable streaming
+    FEATURE_ENABLE_MASSIVE_STREAM: z.coerce.boolean().default(true),
 
-  DISCORD_ENABLED: z.coerce.boolean().default(false),
-  DISCORD_WEBHOOK_URL: z.string().optional(),
-  DISCORD_TIMEOUT_MS: z.coerce.number().default(3000),
-  DISCORD_MAX_RETRIES: z.coerce.number().default(3),
-  DISCORD_RETRY_BASE_MS: z.coerce.number().default(200),
+    // API key required if streaming enabled
+    MASSIVE_API_KEY: z.string().min(1).optional(),
 
-  ADMIN_KEY: z.string().min(1, "ADMIN_KEY is required"),
-  ALLOWED_WS_ORIGINS: z.string().default(""),
-  TRUST_PROXY: z.coerce.boolean().default(false),
-  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-});
+    // WebSocket server tuneables
+    WS_MAX_PAYLOAD_BYTES: z.coerce.number().int().positive().default(2_000_000),
+    WS_HEARTBEAT_INTERVAL_MS: z.coerce.number().int().positive().default(10_000),
+    WS_IDLE_CLOSE_MS: z.coerce.number().int().positive().default(5 * 60 * 1000),
 
-export type ServerEnv = z.infer<typeof schema>;
+    // Optional diagnostics
+    DISCORD_WEBHOOK_URL: z.string().url().optional(),
+  })
+  .superRefine((env, ctx) => {
+    if (env.FEATURE_ENABLE_MASSIVE_STREAM && !env.MASSIVE_API_KEY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["MASSIVE_API_KEY"],
+        message: "MASSIVE_API_KEY is required when FEATURE_ENABLE_MASSIVE_STREAM=true",
+      });
+    }
+  });
 
-export const serverEnv: ServerEnv = (() => {
-  const parsed = schema.safeParse(process.env);
+function readEnv(): Record<string, string | undefined> {
+  return process.env as Record<string, string | undefined>;
+}
+
+export const serverEnv = (() => {
+  const parsed = ServerEnvSchema.safeParse(readEnv());
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
-    throw new Error("Invalid environment configuration:\n" + issues.join("\n"));
+    console.error("❌ Invalid server environment:");
+    console.error(parsed.error.format());
+    if (process.env.NODE_ENV === "production") {
+      process.exit(1);
+    }
+    return ServerEnvSchema.parse({});
   }
   return parsed.data;
 })();

@@ -2,7 +2,7 @@ import { WebSocketServer } from "ws";
 import type { IncomingMessage } from "http";
 import type { RawData, WebSocket } from "ws";
 import type { ServerOutbound } from "@fancytrader/shared";
-import { serverEnv } from "@fancytrader/shared";
+import { serverEnv } from "@fancytrader/shared/server";
 import { z } from "zod";
 import { DetectedSetup, UpstreamProvider, WSMessage } from "../types/index.js";
 import { MassiveStreamingService } from "../services/massiveStreamingService.js";
@@ -55,7 +55,7 @@ export function setupWebSocketHandler(
     options.streamingService ??
     new MassiveStreamingService({
       baseUrl: serverEnv.MASSIVE_WS_BASE,
-      apiKey: serverEnv.MASSIVE_API_KEY,
+      apiKey: serverEnv.MASSIVE_API_KEY!,
       cluster: serverEnv.MASSIVE_WS_CLUSTER,
     });
 

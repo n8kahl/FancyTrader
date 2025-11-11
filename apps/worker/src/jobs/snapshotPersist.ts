@@ -1,5 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
-import { MassiveClient, serverEnv } from "@fancytrader/shared";
+import { MassiveClient } from "@fancytrader/shared";
+import { serverEnv } from "@fancytrader/shared/server";
+import { workerEnv } from "../env";
 
 export async function persistSnapshots(symbols: string[]) {
   if (!symbols?.length) return 0;
@@ -8,7 +10,11 @@ export async function persistSnapshots(symbols: string[]) {
   if (!(url && key)) return 0;
 
   const sb = createClient(url, key, { auth: { persistSession: false } });
-  const massive = new MassiveClient();
+  const massive = new MassiveClient({
+    baseUrl: workerEnv.MASSIVE_BASE_URL,
+    socketUrl: workerEnv.MASSIVE_SOCKET_URL,
+    apiKey: workerEnv.MASSIVE_API_KEY,
+  });
 
   const rows: Array<{ symbol: string; asof: string; data: unknown; source: string }> = [];
 

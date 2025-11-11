@@ -1,4 +1,5 @@
 import ConnectionStatus from "./components/ConnectionStatus";
+import HealthBanner from "./components/HealthBanner";
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { TradeCard } from "./components/TradeCard";
@@ -794,6 +795,7 @@ const activeTrades: UiTrade[] = trades
         reason={connectionReason ?? undefined}
         onRetry={manualReconnect}
       />
+      <HealthBanner apiBase={import.meta.env.VITE_BACKEND_BASE ?? ""} />
 
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">

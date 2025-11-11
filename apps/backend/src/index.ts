@@ -7,7 +7,8 @@ import { PolygonClient } from "./services/polygonClient.js";
 import { AlertEvaluator, type AlertBroadcastPayload } from "./alerts/evaluator.js";
 import { logger } from "./utils/logger.js";
 import { createApp } from "./app.js";
-import { serverEnv } from "@fancytrader/shared";
+import { serverEnv } from "@fancytrader/shared/server";
+import { validateEnv } from "./utils/envCheck.js";
 
 declare global {
   var __WSS_READY__: boolean | undefined;
@@ -28,6 +29,8 @@ const boolFromEnv = (value: string | undefined, fallback: boolean): boolean => {
 };
 
 const streamingEnabled = boolFromEnv(process.env.STREAMING_ENABLED, true);
+
+validateEnv();
 
 try {
   const { app, services, streaming } = await createApp();
@@ -90,28 +93,28 @@ try {
     }
   });
 
-  process.on("SIGTERM", async () => {
-    logger.info("SIGTERM received, shutting down gracefully...");
-    alertEvaluator.stop();
-
-    globalThis.__WSS_READY__ = false;
-    wss.clients.forEach((client) => client.close());
-    wss.close();
-
-    if (streaming) {
-      await streaming.stop();
-    }
-
-    server.close(() => {
-      logger.info("Server closed");
-      process.exit(0);
-    });
-
-    setTimeout(() => {
-      logger.error("Forced shutdown after timeout");
+  const shutdown = async (signal: string) => {
+    try {
+      logger.warn(`Received ${signal}, shutting down...`);
+      alertEvaluator.stop();
+      globalThis.__WSS_READY__ = false;
+      wss.clients.forEach((client) => client.close());
+      wss.close();
+      if (streaming && typeof streaming.stop === "function") {
+        await streaming.stop();
+      }
+      server.close(() => {
+        logger.info("Server closed");
+        process.exit(0);
+      });
+    } catch (e) {
+      logger.error("Error during shutdown", { error: e });
       process.exit(1);
-    }, 10000);
-  });
+    }
+  };
+
+  process.on("SIGINT", () => void shutdown("SIGINT"));
+  process.on("SIGTERM", () => void shutdown("SIGTERM"));
 } catch (err) {
   logger.error("fatal error while starting backend", { err });
   process.exit(1);

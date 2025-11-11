@@ -1,61 +1,27 @@
-/**
- * Safe environment variable accessor
- * Handles cases where import.meta.env might be undefined
- */
+// apps/frontend/src/utils/env.ts
 
-export const getEnv = () => {
-  // Check if import.meta.env exists
-  const env = typeof import.meta !== "undefined" ? import.meta?.env : undefined;
-  if (env) {
-    return env;
-  }
-
-  // Fallback to empty object with defaults
-  return {
-    DEV: false,
-    PROD: true,
-    MODE: "production",
-    VITE_BACKEND_URL: undefined,
-    VITE_BACKEND_WS_URL: undefined,
-  };
+// Include both our VITE_* keys and Vite's built-ins (DEV/PROD/MODE)
+type ClientEnv = {
+  VITE_BACKEND_URL?: string;
+  VITE_BACKEND_WS_URL?: string;
+  VITE_DEMO_USER_ID?: string;
+  VITE_STATUS_BANNER?: string;
+  // Vite built-ins
+  DEV?: boolean;
+  PROD?: boolean;
+  MODE?: string;
 };
 
-export const isDev = () => {
-  try {
-    return getEnv().DEV ?? false;
-  } catch {
-    return false;
-  }
-};
+// Runtime-safe getter that works in browser builds
+function getEnv(): ClientEnv {
+  const env = (typeof import.meta !== "undefined" && (import.meta as any).env) || {};
+  return env as ClientEnv;
+}
 
-export const isProd = () => {
-  try {
-    return getEnv().PROD ?? true;
-  } catch {
-    return true;
-  }
-};
+export const isDev = () => getEnv().DEV ?? false;
+export const isProd = () => getEnv().PROD ?? true;
+export const getMode = () => getEnv().MODE ?? "production";
 
-export const getMode = () => {
-  try {
-    return getEnv().MODE ?? "production";
-  } catch {
-    return "production";
-  }
-};
-
-export const getBackendUrl = () => {
-  try {
-    return getEnv().VITE_BACKEND_URL || "https://fancy-trader.up.railway.app";
-  } catch {
-    return "https://fancy-trader.up.railway.app";
-  }
-};
-
-export const getBackendWsUrl = () => {
-  try {
-    return getEnv().VITE_BACKEND_WS_URL || "wss://fancy-trader.up.railway.app/ws";
-  } catch {
-    return "wss://fancy-trader.up.railway.app/ws";
-  }
-};
+export const getBackendUrl = () => getEnv().VITE_BACKEND_URL || "https://fancy-trader.up.railway.app";
+export const getBackendWsUrl = () =>
+  getEnv().VITE_BACKEND_WS_URL || "wss://fancy-trader.up.railway.app/ws";

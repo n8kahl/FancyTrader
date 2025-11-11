@@ -57,3 +57,48 @@ export function incPolygonRest(ok: boolean, status?: number): void {
 export function incPolygonWsMessages(count = 1): void {
   metrics.polygon.wsMessages += count;
 }
+
+// === Massive WebSocket metrics ===
+export const massiveWsConnected = new client.Gauge({
+  name: "massive_ws_connected",
+  help: "1 if Massive WS is connected, else 0",
+});
+
+export const massiveWsConnectsTotal = new client.Counter({
+  name: "massive_ws_connects_total",
+  help: "Total Massive WS open/connect events",
+});
+
+export const massiveWsDisconnectsTotal = new client.Counter({
+  name: "massive_ws_disconnects_total",
+  help: "Total Massive WS close/disconnect events",
+});
+
+export const massiveWsMessagesTotal = new client.Counter({
+  name: "massive_ws_messages_total",
+  help: "Total Massive WS messages received",
+});
+
+export const massiveWsErrorsTotal = new client.Counter({
+  name: "massive_ws_errors_total",
+  help: "Total Massive WS error events",
+});
+
+export const massiveWsHeartbeatMissedTotal = new client.Counter({
+  name: "massive_ws_heartbeat_missed_total",
+  help: "Total Massive WS heartbeat_missed events",
+});
+
+export const massiveWsReconnectsTotal = new client.Counter({
+  name: "massive_ws_reconnects_total",
+  help: "Total Massive WS forced restarts by watchdog/backoff",
+});
+
+// Make sure they're registered
+register.registerMetric(massiveWsConnected);
+register.registerMetric(massiveWsConnectsTotal);
+register.registerMetric(massiveWsDisconnectsTotal);
+register.registerMetric(massiveWsMessagesTotal);
+register.registerMetric(massiveWsErrorsTotal);
+register.registerMetric(massiveWsHeartbeatMissedTotal);
+register.registerMetric(massiveWsReconnectsTotal);

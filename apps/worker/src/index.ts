@@ -1,6 +1,8 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { MassiveClient, marketToMode, serverEnv } from "@fancytrader/shared";
+import { MassiveClient, marketToMode } from "@fancytrader/shared";
+import { serverEnv } from "@fancytrader/shared/server";
+import { workerEnv, assertWorkerEnv } from "./env";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { snapshotIndices } from "./clients/massive.js";
 import {
@@ -22,8 +24,24 @@ const WATCH_SYMBOLS = (process.env.WORKER_SYMBOLS ?? "SPY,QQQ")
   .map((symbol) => symbol.trim().toUpperCase())
   .filter(Boolean);
 
+const logger = {
+  info: (...args: any[]) => console.log("[worker:info ]", ...args),
+  debug: (...args: any[]) => console.debug("[worker:debug]", ...args),
+  warn: (...args: any[]) => console.warn("[worker:warn ]", ...args),
+  error: (...args: any[]) => console.error("[worker:error]", ...args),
+};
+
+assertWorkerEnv();
+
+const createMassiveClient = () =>
+  new MassiveClient({
+    baseUrl: workerEnv.MASSIVE_BASE_URL,
+    socketUrl: workerEnv.MASSIVE_SOCKET_URL,
+    apiKey: workerEnv.MASSIVE_API_KEY,
+  });
+
 let supabase: SupabaseClient | null = null;
-let massiveClient: MassiveClient = new MassiveClient();
+let massiveClient: MassiveClient = createMassiveClient();
 const lastSnapshots = new Map<string, unknown>();
 
 const getSupabaseClient = (): SupabaseClient => {
@@ -151,16 +169,18 @@ export const __setMassiveClientForTests = (client: MassiveClient): void => {
 };
 
 export const __resetMassiveClientForTests = (): void => {
-  massiveClient = new MassiveClient();
+  massiveClient = createMassiveClient();
 };
 
 export const __resetSupabaseClientForTests = (): void => {
   supabase = null;
 };
 
-const isDirectRun =
-  process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
-if (isDirectRun) {
+const isMain =
+  (typeof require !== "undefined" && (require as any).main === module) ||
+  (typeof import.meta !== "undefined" &&
+    pathToFileURL(resolve(process.argv[1])).href === (import.meta as any).url);
+if (isMain) {
   main().catch(async (error) => {
     await sendDiscordAlert({
       enabled: serverEnv.DISCORD_ENABLED,
@@ -169,7 +189,7 @@ if (isDirectRun) {
       title: "Worker scan failed",
       fields: { message: error instanceof Error ? error.message : String(error) },
     });
-    console.error("Worker failed", error);
+    logger.error({ error }, "worker crashed");
     process.exit(1);
   });
 }

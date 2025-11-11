@@ -52,7 +52,14 @@ router.get("/readyz", async (_req, res, next) => {
     const websocketReady = streamingEnabled ? Boolean(globalThis.__WSS_READY__) : true;
     const restReachable = massiveKey ? await checkMassiveReachable() : false;
 
-    const ok = (!streamingEnabled || websocketReady) && massiveKey && restReachable;
+    const lastMsgTs = (globalThis as any).__LAST_MSG_TS__ as number | undefined;
+    const now = Date.now();
+    const msgAgeSec = lastMsgTs ? Math.floor((now - lastMsgTs) / 1000) : null;
+
+    // Define "fresh enough" as <= 60s if streaming is required
+    const streamFreshEnough = !streamingEnabled || (msgAgeSec !== null && msgAgeSec <= 60);
+
+    const ok = (!streamingEnabled || websocketReady) && massiveKey && restReachable && streamFreshEnough;
 
     res.status(ok ? 200 : 503).json({
       ok,
@@ -61,6 +68,9 @@ router.get("/readyz", async (_req, res, next) => {
         websocketReady,
         restReachable,
         streamingEnabled,
+        lastMessageAt: lastMsgTs ?? null,
+        messageAgeSec: msgAgeSec,
+        freshnessOk: streamFreshEnough,
       },
     });
   } catch (err) {

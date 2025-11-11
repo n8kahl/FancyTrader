@@ -1,4 +1,4 @@
-import { serverEnv } from "@fancytrader/shared";
+import { serverEnv } from "@fancytrader/shared/server";
 
 const boolFromEnv = (value: string | undefined, defaultValue: boolean): boolean => {
   if (typeof value !== "string") return defaultValue;
@@ -15,15 +15,8 @@ const numberFromEnv = (value: string | undefined, defaultValue: number): number 
 
 const FIFTEEN_MINUTES_MS = 15 * 60 * 1000;
 
-const legacyPolygon =
-  process.env.FEATURE_ENABLE_POLYGON_STREAM ?? process.env.POLYGON_WS_ENABLED;
-const polygonEnabled =
-  typeof serverEnv.FEATURE_POLYGON_ENABLED === "boolean"
-    ? serverEnv.FEATURE_POLYGON_ENABLED
-    : boolFromEnv(legacyPolygon, false);
-
 export const featureFlags = {
-  enablePolygonStream: polygonEnabled,
+  enablePolygonStream: false,
   enableMassiveStream: serverEnv.FEATURE_ENABLE_MASSIVE_STREAM,
   polygonBackoffOnMax: boolFromEnv(process.env.FEATURE_POLYGON_BACKOFF_ON_MAX, true),
   polygonMaxSleepMs: numberFromEnv(process.env.FEATURE_POLYGON_MAX_SLEEP_MS, FIFTEEN_MINUTES_MS),

@@ -64,9 +64,13 @@ export class MassiveStreamingService extends EventEmitter {
   }
 
   private connect(): void {
-    const baseUrl = this.options.baseUrl.replace(/\/+$/, "");
-    const cluster = this.options.cluster ?? "options";
-    const url = `${baseUrl}/${cluster}?apiKey=${this.options.apiKey}`;
+    const base = this.options.baseUrl;
+    const cluster = (this.options.cluster ?? "options").trim();
+    const urlObj = new URL(base);
+    const normalizedPath = urlObj.pathname.replace(/\/+$|^$/g, "");
+    urlObj.pathname = [normalizedPath, cluster].filter(Boolean).join("/");
+    urlObj.searchParams.set("apiKey", this.options.apiKey);
+    const url = urlObj.toString();
     this.logFn("ws_connecting", { url });
     this.ws = new WebSocket(url);
 

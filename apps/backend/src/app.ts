@@ -6,7 +6,18 @@ import helmet from "helmet";
 import { healthRouter } from "./routes/health.js";
 import { setupRoutes } from "./routes/index.js";
 import { snapshotsRouter } from "./routes/snapshots.js";
-import { incHttp, register } from "./utils/metrics.js";
+import { sleep, expoBackoffJitter } from "./utils/backoff.js";
+import {
+  incHttp,
+  register,
+  massiveWsConnected,
+  massiveWsConnectsTotal,
+  massiveWsDisconnectsTotal,
+  massiveWsMessagesTotal,
+  massiveWsErrorsTotal,
+  massiveWsHeartbeatMissedTotal,
+  massiveWsReconnectsTotal,
+} from "./utils/metrics.js";
 import { logger } from "./utils/logger.js";
 import { SupabaseService } from "./services/supabaseService.js";
 import { SupabaseSetupsService } from "./services/supabaseSetups.js";
@@ -16,13 +27,15 @@ import { defaultStrategyParams } from "./config/strategy.defaults.js";
 import { errorHandler } from "./middleware/error.js";
 import { alertLimiter, shareLimiter } from "./middleware/rateLimit.js";
 import { requestId } from "./middleware/requestId.js";
-import { serverEnv } from "@fancytrader/shared";
+import { serverEnv } from "@fancytrader/shared/server";
 import { featureFlags } from "./config/features.js";
 import pino from "pino";
 
 const log = pino({ name: "app" });
-const defaultAllowedOrigins =
-  serverEnv.CORS_ALLOWLIST.split(",").map((value) => value.trim()).filter(Boolean);
+  const allowlist = serverEnv.CORS_ALLOWLIST.split(",")
+    .map((value: string) => value.trim())
+    .filter(Boolean);
+  const defaultAllowedOrigins = allowlist;
 const corsAllowedMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 const corsAllowedHeaders = [
   "Content-Type",
@@ -249,18 +262,123 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
       },
     });
 
-    massive.on("message", (msg: unknown) => logger.debug("massive_ws_message", { msg }));
-    massive.on("error", (error: unknown) => logger.error("massive_ws_error", { error }));
+    let lastMessageAt: number | null = null;
+    let connected = false;
+    let watchdogTimer: NodeJS.Timeout | null = null;
+    let restartInFlight = false;
+    let restartAttempt = 0;
+    let streamStopped = false;
+
+    const STALE_AFTER_MS = 90_000;
+    const WATCHDOG_EVERY_MS = 20_000;
+    const BACKOFF_MIN_MS = 1_000;
+    const BACKOFF_MAX_MS = 30_000;
+
+    const markConnected = () => {
+      connected = true;
+      massiveWsConnected.set(1);
+      massiveWsConnectsTotal.inc();
+      restartAttempt = 0;
+      logger.info("Massive WS connected");
+    };
+
+    const markDisconnected = () => {
+      connected = false;
+      massiveWsConnected.set(0);
+      massiveWsDisconnectsTotal.inc();
+      logger.warn("Massive WS disconnected");
+    };
+
+    const setLastMsg = () => {
+      lastMessageAt = Date.now();
+      globalThis.__LAST_MSG_TS__ = lastMessageAt;
+    };
+
+    const startWatchdog = () => {
+      if (watchdogTimer || streamStopped) return;
+      watchdogTimer = setInterval(async () => {
+        try {
+          if (!connected) return;
+          const age = lastMessageAt ? Date.now() - lastMessageAt : Infinity;
+          if (age > STALE_AFTER_MS && !restartInFlight) {
+            restartInFlight = true;
+            restartAttempt += 1;
+            const wait = expoBackoffJitter({
+              attempt: restartAttempt,
+              minMs: BACKOFF_MIN_MS,
+              maxMs: BACKOFF_MAX_MS,
+              factor: 2,
+            });
+            massiveWsReconnectsTotal.inc();
+            logger.warn("massive_ws_watchdog_stale", { ageMs: age, attempt: restartAttempt, waitMs: wait });
+            try {
+              massive.stop();
+              await sleep(wait);
+              massive.start();
+              logger.info("massive_ws_restarted", { attempt: restartAttempt });
+            } catch (e) {
+              logger.error("massive_ws_restart_error", { attempt: restartAttempt, error: e });
+            } finally {
+              restartInFlight = false;
+            }
+          }
+        } catch (e) {
+          logger.error("massive_ws_watchdog_error", { error: e });
+        }
+      }, WATCHDOG_EVERY_MS);
+    };
+
+    const stopWatchdog = () => {
+      if (watchdogTimer) {
+        clearInterval(watchdogTimer);
+        watchdogTimer = null;
+      }
+      restartInFlight = false;
+    };
+
+    massive.on("open", () => {
+      markConnected();
+      startWatchdog();
+    });
+    massive.on("close", () => {
+      markDisconnected();
+    });
+    massive.on("heartbeat_missed", (meta?: Record<string, unknown>) => {
+      massiveWsHeartbeatMissedTotal.inc();
+      logger.warn("massive_ws_heartbeat_missed", meta ?? {});
+    });
+
+    massive.on("message", (msg: unknown) => {
+      massiveWsMessagesTotal.inc();
+      setLastMsg();
+      logger.debug("massive_ws_message", { msg });
+    });
+
+    massive.on("error", (error: unknown) => {
+      massiveWsErrorsTotal.inc();
+      logger.error("massive_ws_error", { error });
+    });
 
     streaming = {
       start: async () => {
+        lastMessageAt = null;
+        restartAttempt = 0;
+        restartInFlight = false;
+        streamStopped = false;
         massive.start();
+        startWatchdog();
         globalThis.__WSS_READY__ = true;
         logger.info("Massive streaming enabled");
       },
       stop: async () => {
         globalThis.__WSS_READY__ = false;
-        massive.stop();
+        streamStopped = true;
+        stopWatchdog();
+        try {
+          massive.stop();
+        } finally {
+          connected = false;
+        }
       },
     };
   } else {

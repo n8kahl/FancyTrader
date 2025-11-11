@@ -27,12 +27,22 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "default": "./dist/index.js"
-    },
-    "./cjs": {
-      "types": "./dist/index.d.ts",
       "require": "./dist/index.cjs"
+    },
+    "./server": {
+      "types": "./src/env.server.ts",
+      "default": "./src/env.server.ts"
+    },
+    "./client": {
+      "types": "./src/env.client.ts",
+      "default": "./src/env.client.ts"
     }
-  }
+  },
+  "typesVersions": {
+    "*": {
+      "server": ["src/env.server.ts"],
+      "client": ["src/env.client.ts"]
+    }
+  },
+  "sideEffects": false
 }
