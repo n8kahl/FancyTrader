@@ -2,26 +2,19 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Enable pnpm via corepack
 RUN corepack enable
 
-# Copy workspace manifests so pnpm can resolve deps without full sources
-# Copy workspace manifests so pnpm can resolve deps without full sources
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/backend/package.json apps/backend/
 
-# Install ALL workspace deps (hoisted)
 RUN pnpm install --frozen-lockfile
 
-# Copy full source tree
 COPY . .
 
-# Build shared + backend only (skip frontend to avoid requiring Vite during backend image builds)
 RUN pnpm --filter @fancytrader/shared build && \
     pnpm --filter @fancytrader/backend build
 
-# Prune dev deps for production
 RUN pnpm prune --prod
 
 # --- runtime stage ---
@@ -31,17 +24,18 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3001
 
-# Copy pnpm manifests + shared package so runtime pnpm install can succeed
+RUN corepack enable
+
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/backend/package.json apps/backend/
 COPY --from=builder /app/packages/shared ./packages/shared
 
-# Install production dependencies for only the backend filter
-RUN corepack enable
+RUN chown -R node:node /app
+USER node
+
 RUN pnpm --filter @fancytrader/backend install --prod --frozen-lockfile
 
-# Copy built artifacts
-COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
+COPY --from=builder --chown=node:node /app/apps/backend/dist ./apps/backend/dist
 
 EXPOSE 3001
 

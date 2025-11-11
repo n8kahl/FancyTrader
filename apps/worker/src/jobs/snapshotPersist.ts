@@ -12,7 +12,6 @@ export async function persistSnapshots(symbols: string[]) {
   const sb = createClient(url, key, { auth: { persistSession: false } });
   const massive = new MassiveClient({
     baseUrl: workerEnv.MASSIVE_BASE_URL,
-    socketUrl: workerEnv.MASSIVE_SOCKET_URL,
     apiKey: workerEnv.MASSIVE_API_KEY,
   });
 

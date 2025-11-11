@@ -1,12 +1,17 @@
-const parseAllowedOrigins = (): string[] =>
-  (process.env.ALLOWED_WS_ORIGINS || "")
+import { serverEnv } from "@fancytrader/shared/server";
+
+const previewRegex = /^https:\/\/fancy-trader(-[a-z0-9-]+)?\.vercel\.app$/;
+
+function parseAllowlist(): string[] {
+  return (serverEnv.CORS_ALLOWLIST || "")
     .split(",")
-    .map((origin) => origin.trim())
+    .map((o) => o.trim())
     .filter(Boolean);
+}
 
 export function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
-  const allowed = parseAllowedOrigins();
+  const allowed = parseAllowlist();
   if (allowed.length === 0) return true;
-  return allowed.some((entry) => origin.startsWith(entry));
+  return allowed.includes(origin) || previewRegex.test(origin);
 }
