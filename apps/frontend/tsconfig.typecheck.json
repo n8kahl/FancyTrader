@@ -2,11 +2,9 @@
   "extends": "./tsconfig.json",
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [
-    "node_modules",
-    "dist",
     "src/__tests__/**",
-    "**/*.test.*",
-    "**/*.spec.*",
-    "**/*.stories.*"
+    "src/**/*.stories.tsx",
+    "src/supabase/**",
+    "src/utils/connectionTest.ts"
   ]
 }
