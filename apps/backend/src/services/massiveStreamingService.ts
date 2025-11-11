@@ -33,6 +33,7 @@ export class MassiveStreamingService extends EventEmitter {
   private backoff = 250;
   private heartbeat?: NodeJS.Timeout;
   private heartbeatTimeout?: NodeJS.Timeout;
+  private reconnectTimer?: NodeJS.Timeout;
   private subs: string[];
 
   constructor(private readonly options: MassiveStreamingOptions) {
@@ -54,6 +55,10 @@ export class MassiveStreamingService extends EventEmitter {
     if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.heartbeatTimeout) clearTimeout(this.heartbeatTimeout);
     this.ws?.close();
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
   }
 
   subscribe(channel: string): void {
@@ -104,6 +109,10 @@ export class MassiveStreamingService extends EventEmitter {
   private handleOpen(url: string): void {
     this.logFn("ws_open", { url });
     this.backoff = 250;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
     this.flushSubscriptions();
     this.startHeartbeat();
     this.emit("open");
@@ -147,9 +156,19 @@ export class MassiveStreamingService extends EventEmitter {
     if (this.heartbeat) clearInterval(this.heartbeat);
     if (this.heartbeatTimeout) clearTimeout(this.heartbeatTimeout);
 
+    const onPong = () => this.touchHeartbeat();
+    this.ws?.off?.("pong", onPong);
+    this.ws?.on?.("pong", onPong);
+
     const ping = () => {
       if (this.ws?.readyState !== WebSocket.OPEN) return;
-      this.send({ action: "ping" });
+      try {
+        // ws ping frame
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (this.ws as any).ping();
+      } catch (error) {
+        this.logFn("ws_ping_error", { error: String(error) });
+      }
       this.scheduleHeartbeatTimeout();
     };
 
@@ -180,7 +199,7 @@ export class MassiveStreamingService extends EventEmitter {
     const jitter = Math.random() * 100;
     const wait = Math.min(this.backoff + jitter, 5_000);
     this.logFn("ws_reconnect_scheduled", { wait });
-    setTimeout(() => {
+    this.reconnectTimer = setTimeout(() => {
       this.backoff = Math.min(this.backoff * 2, 5_000);
       this.connect();
     }, wait);
