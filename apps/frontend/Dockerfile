@@ -30,7 +30,7 @@ RUN pnpm --filter @fancytrader/shared build && \
 FROM nginx:alpine AS runtime
 
 # Copy nginx config + built SPA
-COPY apps/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/apps/frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/apps/frontend/build /usr/share/nginx/html
 
 EXPOSE 80
