@@ -30,3 +30,6 @@ export * from "./client/massive";
 export * from "./massive/snapshots";
 
 export * from "./contracts/strategy";
+
+export { serverEnv } from "./env.server";
+export { clientEnv } from "./env.client";

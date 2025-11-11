@@ -7,6 +7,7 @@ import { PolygonClient } from "./services/polygonClient.js";
 import { AlertEvaluator, type AlertBroadcastPayload } from "./alerts/evaluator.js";
 import { logger } from "./utils/logger.js";
 import { createApp } from "./app.js";
+import { serverEnv } from "@fancytrader/shared";
 
 declare global {
   var __WSS_READY__: boolean | undefined;
@@ -31,7 +32,19 @@ const streamingEnabled = boolFromEnv(process.env.STREAMING_ENABLED, true);
 try {
   const { app, services, streaming } = await createApp();
   const server = createServer(app);
-  const wss = new WebSocketServer({ server, path: "/ws" });
+  const wss = new WebSocketServer({
+    noServer: true,
+    maxPayload: serverEnv.WS_MAX_PAYLOAD_BYTES,
+  });
+  server.on("upgrade", (req, socket, head) => {
+    if (req.url === "/ws") {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit("connection", ws, req);
+      });
+    } else {
+      socket.destroy();
+    }
+  });
   globalThis.__WSS_READY__ = false;
 
   const polygonClient = new PolygonClient();
@@ -66,16 +79,16 @@ try {
 
   const PORT = process.env.PORT || 8080;
 
-    server.listen(PORT, () => {
-      logger.info(`🚀 Fancy Trader Backend running on port ${PORT}`);
-      logger.info(`WebSocket available at ws://localhost:${PORT}/ws`);
-      logger.info(`Environment: ${process.env.NODE_ENV}`);
-      if (streaming) {
-        void streaming.start().catch((error) =>
-          logger.error("Streaming failed to start", { error })
-        );
-      }
-    });
+  server.listen(PORT, () => {
+    logger.info(`🚀 Fancy Trader Backend running on port ${PORT}`);
+    logger.info(`WebSocket available at ws://localhost:${PORT}/ws`);
+    logger.info(`Environment: ${process.env.NODE_ENV}`);
+    if (streaming) {
+      void streaming.start().catch((error) =>
+        logger.error("Streaming failed to start", { error })
+      );
+    }
+  });
 
   process.on("SIGTERM", async () => {
     logger.info("SIGTERM received, shutting down gracefully...");

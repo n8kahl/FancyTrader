@@ -2,6 +2,7 @@ import { WebSocketServer } from "ws";
 import type { IncomingMessage } from "http";
 import type { RawData, WebSocket } from "ws";
 import type { ServerOutbound } from "@fancytrader/shared";
+import { serverEnv } from "@fancytrader/shared";
 import { z } from "zod";
 import { DetectedSetup, UpstreamProvider, WSMessage } from "../types/index.js";
 import { MassiveStreamingService } from "../services/massiveStreamingService.js";
@@ -40,6 +41,9 @@ const inboundSchema = z.discriminatedUnion("type", [
 type InboundMessage = z.infer<typeof inboundSchema>;
 type SubscriptionPayload = z.infer<typeof subscriptionPayloadSchema>;
 
+const HEARTBEAT_MS = serverEnv.WS_HEARTBEAT_INTERVAL_MS;
+const IDLE_CLOSE_MS = serverEnv.WS_IDLE_CLOSE_MS;
+
 export function setupWebSocketHandler(
   wss: WebSocketServer,
   services: Services,
@@ -50,9 +54,9 @@ export function setupWebSocketHandler(
   const streamingService =
     options.streamingService ??
     new MassiveStreamingService({
-      baseUrl: process.env.MASSIVE_WS_BASE || "wss://socket.massive.com",
-      apiKey: process.env.MASSIVE_API_KEY || "",
-      cluster: process.env.MASSIVE_WS_CLUSTER || "options",
+      baseUrl: serverEnv.MASSIVE_WS_BASE,
+      apiKey: serverEnv.MASSIVE_API_KEY,
+      cluster: serverEnv.MASSIVE_WS_CLUSTER,
     });
 
   if (enableStreaming) {
@@ -115,13 +119,13 @@ export function setupWebSocketHandler(
         sendServerOutbound(ws, { type: "status", message: "HEARTBEAT" });
       }
 
-      if (now - meta.lastActivity > 60_000) {
+      if (now - meta.lastActivity > IDLE_CLOSE_MS) {
         logger.warn("Closing idle WebSocket connection");
         ws.close(1000, "idle timeout");
         clientMeta.delete(ws);
       }
     }
-  }, 15_000);
+  }, HEARTBEAT_MS);
 
   wss.on("close", () => {
     clearInterval(heartbeatInterval);
