@@ -32,7 +32,8 @@ const streamingEnabled = boolFromEnv(process.env.STREAMING_ENABLED, true);
 
 validateEnv();
 logger.info("startup_env", {
-  STREAMING_ENABLED: process.env.FEATURE_ENABLE_MASSIVE_STREAM,
+  STREAMING_ENABLED: process.env.STREAMING_ENABLED,
+  FEATURE_ENABLE_MASSIVE_STREAM: serverEnv.FEATURE_ENABLE_MASSIVE_STREAM,
   MASSIVE_WS_BASE: serverEnv.MASSIVE_WS_BASE,
   MASSIVE_WS_CLUSTER: serverEnv.MASSIVE_WS_CLUSTER,
 });
@@ -72,7 +73,7 @@ try {
   setupWebSocketHandler(
     wss,
     { strategyDetector: services.strategyDetector },
-    { enableStreaming: streamingEnabled }
+    { enableStreaming: false }
   );
 
   if (!streamingEnabled) {
