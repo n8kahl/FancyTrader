@@ -795,7 +795,7 @@ const activeTrades: UiTrade[] = trades
         reason={connectionReason ?? undefined}
         onRetry={manualReconnect}
       />
-      <HealthBanner apiBase={import.meta.env.VITE_BACKEND_BASE ?? ""} />
+      <HealthBanner apiBase={getBackendUrl()} />
 
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">

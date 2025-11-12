@@ -38,13 +38,13 @@ export function useReadyz(pollMs = 5000, baseUrl = ""): Health {
 
         if (cancelled) return;
 
-        const age = json.checks.messageAgeSec ?? null;
+        const age = json.checks?.messageAgeSec ?? null;
         let state: Health["state"] = "down";
         let reason = "unknown";
         if (json.ok) {
           state = "healthy";
           reason = "stream fresh";
-        } else if (json.checks.websocketReady && !json.checks.freshnessOk) {
+        } else if (json.checks?.websocketReady && json.checks?.freshnessOk === false) {
           state = "stale";
           reason = `no messages for ${age ?? "?"}s`;
         } else {
