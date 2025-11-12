@@ -7,6 +7,7 @@ import configRouter from "./routes/config.js";
 import { healthRouter } from "./routes/health.js";
 import { setupRoutes } from "./routes/index.js";
 import { snapshotsRouter } from "./routes/snapshots.js";
+import metricsRouter from "./routes/metrics.js";
 import { sleep, expoBackoffJitter } from "./utils/backoff.js";
 import {
   incHttp,
@@ -174,24 +175,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
 
   app.use(healthRouter);
   app.use(configRouter);
-  app.get("/api/metrics", async (req, res) => {
-    const configured = (process.env.ADMIN_KEY || "").trim();
-    if (!configured) {
-      res.status(503).json({ error: "Metrics disabled (missing ADMIN_KEY)" });
-      return;
-    }
-
-    const headerKey = req.header("x-admin-key")?.trim();
-    if (!headerKey || headerKey !== configured) {
-      res.status(401).json({ error: "Unauthorized" });
-      return;
-    }
-
-    res.set("Content-Type", register.contentType);
-    res.send(await register.metrics());
-  });
-
   app.use("/api", healthRouter);
+  app.use("/api", metricsRouter);
 
   app.use("/api/alerts", alertLimiter);
   app.use("/api/share", shareLimiter);
