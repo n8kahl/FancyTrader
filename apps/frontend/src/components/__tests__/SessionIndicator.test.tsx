@@ -1,3 +1,4 @@
+import "../../../tests/setup.vitest";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { SessionIndicator } from "../SessionIndicator";

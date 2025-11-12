@@ -1,3 +1,4 @@
+import "../../../tests/setup.vitest";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { SymbolChartWithAnnotations } from "../../components/SymbolChartWithAnnotations";

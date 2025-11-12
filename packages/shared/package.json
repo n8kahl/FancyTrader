@@ -10,7 +10,7 @@
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsup -c",
+    "build": "tsup",
     "dev": "tsup src/index.ts src/env.server.ts src/env.client.ts src/client/massive.ts --dts --format esm,cjs --watch --sourcemap",
     "clean": "rimraf dist"
   },

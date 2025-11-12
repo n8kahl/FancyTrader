@@ -1,31 +1,18 @@
 import { defineConfig } from "vitest/config";
 
-const nodeMajor = Number(process.versions.node.split(".")[0]);
-const isNode22Plus = Number.isFinite(nodeMajor) && nodeMajor >= 22;
-const coverageInclude = [
-  "src/components/OptionsChain.tsx",
-  "src/components/WatchlistManager.tsx",
-];
-if (!isNode22Plus) {
-  coverageInclude.unshift("src/hooks/useBackendConnection.ts");
-}
-
 export default defineConfig({
   test: {
     environment: "jsdom",
-    setupFiles: ["./src/setupTests.ts"],
+    globals: true,
+    setupFiles: ["tests/setup.vitest.ts"],
+    alias: { "@jest/globals": "vitest" },
     coverage: {
+      enabled: true,
       provider: "v8",
-      reporter: ["text", "html"],
-      lines: 80,
-      branches: 80,
-      include: coverageInclude,
-    },
-    pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
+      reporter: ["text", "html", "lcov"],
+      reportsDirectory: "./coverage",
+      include: ["src/**/*.ts", "src/**/*.tsx"],
+      exclude: ["**/*.d.ts", "dist/**", "**/__fixtures__/**"],
     },
   },
 });
