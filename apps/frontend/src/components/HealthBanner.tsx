@@ -1,29 +1,27 @@
 import React from "react";
 import { useReadyz } from "../hooks/useReadyz";
+import { useSession } from "../hooks/useSession";
+import { useMockMode } from "../hooks/useMockMode";
 
 type Props = {
-  apiBase?: string; // e.g. "http://localhost:3001"
+  apiBase: string;
 };
 
-const colorByState: Record<"healthy" | "stale" | "down", string> = {
-  healthy: "bg-emerald-600",
-  stale: "bg-amber-500",
-  down: "bg-rose-600",
-};
+export default function HealthBanner({ apiBase }: Props) {
+  const mockMode = useMockMode();
+  const { phase } = useSession();
+  const readyz = useReadyz(5000, apiBase, { sessionPhase: phase, mockMode });
 
-export default function HealthBanner({ apiBase = "" }: Props) {
-  const { state, reason, age } = useReadyz(5000, apiBase);
+  if (mockMode || phase === "closed" || readyz.status !== "down") {
+    return null;
+  }
 
   return (
-    <div
-      className={`${colorByState[state]} text-white px-3 py-2 text-sm flex items-center justify-between`}
-    >
+    <div className="bg-rose-600 text-white px-3 py-2 text-sm flex items-center justify-between">
       <div className="font-medium">
-        {state === "healthy" && "Stream: Healthy"}
-        {state === "stale" && "Stream: Stale"}
-        {state === "down" && "Stream: Down"}
+        Stream: Down
         <span className="opacity-90 ml-2">
-          ({reason}{typeof age === "number" ? `, age=${age}s` : ""})
+          ({readyz.reason ?? "Connection issue"})
         </span>
       </div>
       <button

@@ -1,6 +1,6 @@
 import ConnectionStatus from "./components/ConnectionStatus";
 import HealthBanner from "./components/HealthBanner";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { TradeCard } from "./components/TradeCard";
 import type { Trade, TradeAlert } from "@/types/trade";
@@ -50,6 +50,9 @@ import {
 } from "./types/options";
 import { generateMockTrades } from "./utils/mockTradeGenerator";
 import { useBackendConnection } from "./hooks/useBackendConnection";
+import { useReadyz } from "./hooks/useReadyz";
+import { useSession } from "./hooks/useSession";
+import { MockModeProvider } from "./hooks/useMockMode";
 import { displayWelcomeMessage } from "./utils/welcomeMessage";
 import { logger } from "./utils/logger";
 import { getMode, isDev, getBackendUrl, getBackendWsUrl } from "./utils/env";
@@ -180,6 +183,21 @@ export default function App({ backendDeps }: AppProps = {}) {
     connectionReason,
     manualReconnect,
   } = useBackendConnection();
+
+  const sessionForAnnounce = useSession();
+  const readyzAnnounce = useReadyz(5000, getBackendUrl(), {
+    sessionPhase: sessionForAnnounce.phase,
+    mockMode: useMockData,
+  });
+  const [announcement, setAnnouncement] = useState("");
+  const previousReadyzStatus = useRef<"ok" | "unknown" | "down">("unknown");
+
+  useEffect(() => {
+    if (previousReadyzStatus.current === "down" && readyzAnnounce.status === "ok") {
+      setAnnouncement("Realtime connection recovered");
+    }
+    previousReadyzStatus.current = readyzAnnounce.status;
+  }, [readyzAnnounce.status]);
 
   // Options Trading State
   const [contractSelectorTrade, setContractSelectorTrade] = useState<Trade | null>(null);
@@ -788,14 +806,18 @@ const activeTrades: UiTrade[] = trades
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <Toaster position="top-right" richColors />
-      <ConnectionStatus
-        state={connectionStatus}
-        reason={connectionReason ?? undefined}
-        onRetry={manualReconnect}
-      />
-      <HealthBanner apiBase={getBackendUrl()} />
+    <MockModeProvider value={useMockData}>
+      <div className="min-h-screen bg-background flex flex-col">
+        <Toaster position="top-right" richColors />
+        <ConnectionStatus
+          state={connectionStatus}
+          reason={connectionReason ?? undefined}
+          onRetry={manualReconnect}
+        />
+        <div className="sr-only" aria-live="polite" role="status">
+          {announcement}
+        </div>
+        <HealthBanner apiBase={getBackendUrl()} />
 
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
@@ -1132,6 +1154,7 @@ const activeTrades: UiTrade[] = trades
 
       {/* Toast Notifications */}
       <Toaster />
-    </div>
+      </div>
+    </MockModeProvider>
   );
 }
