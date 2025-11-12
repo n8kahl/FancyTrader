@@ -1,94 +1,41 @@
-import { Express } from "express";
-import { PolygonClient } from "../services/massiveClient.js";
-import { MassiveClient } from "@fancytrader/shared";
-import { asyncHandler } from "../utils/asyncHandler.js";
-import {
-  optionChainQuerySchema,
-  optionContractsQuerySchema,
-  symbolWithOptionParamSchema,
-  underlyingParamSchema,
-} from "../validation/schemas.js";
+import { Router, type Request, type Response } from "express";
+import { z } from "zod";
+import { serverEnv } from "@fancytrader/shared/env.server";
+import { MassiveClient } from "@fancytrader/shared/client/massive";
 
-const polygonClient = new PolygonClient();
-const massive = new MassiveClient();
+const qSchema = z.object({
+  underlying: z.string().min(1),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  page: z.string().optional(),
+});
 
-export function setupOptionsRoutes(app: Express): void {
-  /**
-   * GET /api/options/contracts/:underlying - Get options contracts
-   */
-  app.get(
-    "/api/options/contracts/:underlying",
-    asyncHandler(async (req, res) => {
-      const { underlying } = underlyingParamSchema.parse(req.params);
-      const query = optionContractsQuerySchema.parse(req.query);
-      const normalizedSymbol = underlying.toUpperCase();
-
-      const contracts = await polygonClient.getOptionsContracts(
-        normalizedSymbol,
-        query.expiration,
-        query.type,
-        query.strike
-      );
-
-      res.json({
-        underlying: normalizedSymbol,
-        contracts,
-        count: contracts.length,
-      });
-    })
-  );
-
-  /**
-   * GET /api/options/snapshot/:underlying/:optionSymbol - Get options snapshot
-   */
-  app.get(
-    "/api/options/snapshot/:underlying/:optionSymbol",
-    asyncHandler(async (req, res) => {
-      const { underlying, optionSymbol } = symbolWithOptionParamSchema.parse(req.params);
-      const snapshot = await massive.getOptionSnapshot(
-        underlying.toUpperCase(),
-        optionSymbol.toUpperCase()
-      );
-
-      res.json({
-        underlying: underlying.toUpperCase(),
-        optionSymbol: optionSymbol.toUpperCase(),
-        data: snapshot,
-      });
-    })
-  );
-
-  app.get(
-    "/api/options/quote/:optionSymbol",
-    asyncHandler(async (req, res) => {
-      const { optionSymbol } = symbolWithOptionParamSchema.pick({ optionSymbol: true }).parse(req.params);
-      const quote = await massive.getOptionQuote(optionSymbol.toUpperCase());
-      res.json({ optionSymbol: optionSymbol.toUpperCase(), data: quote });
-    })
-  );
-
-  /**
-   * GET /api/options/chain/:underlying - Get full options chain
-   */
-  app.get(
-    "/api/options/chain/:underlying",
-    asyncHandler(async (req, res) => {
-      const { underlying } = underlyingParamSchema.parse(req.params);
-      const { expiration } = optionChainQuerySchema.parse(req.query);
-      const normalizedSymbol = underlying.toUpperCase();
-
-      const [calls, puts] = await Promise.all([
-        polygonClient.getOptionsContracts(normalizedSymbol, expiration, "call"),
-        polygonClient.getOptionsContracts(normalizedSymbol, expiration, "put"),
-      ]);
-
-      res.json({
-        underlying: normalizedSymbol,
-        expiration,
-        calls,
-        puts,
-        totalContracts: calls.length + puts.length,
-      });
-    })
-  );
+function createMassive(): MassiveClient {
+  if (!serverEnv.MASSIVE_API_KEY || !serverEnv.MASSIVE_REST_BASE) {
+    throw new Error("Missing MASSIVE_API_KEY or MASSIVE_REST_BASE");
+  }
+  return new MassiveClient({
+    baseUrl: serverEnv.MASSIVE_REST_BASE,
+    apiKey: serverEnv.MASSIVE_API_KEY,
+    timeoutMs: 10_000,
+    maxRetries: 5,
+  });
 }
+
+export const optionsRouter = Router();
+
+optionsRouter.get("/contracts", async (req: Request, res: Response) => {
+  const parsed = qSchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const { underlying, limit, page } = parsed.data;
+  try {
+    const massive = createMassive();
+    const data = await massive.getOptionsChain({ underlying, limit, page });
+    res.json(data);
+  } catch (e: any) {
+    const status = e?.response?.status ?? 500;
+    res.status(status).json({ error: e?.message ?? "options_chain_failed" });
+  }
+});
+
+export default optionsRouter;

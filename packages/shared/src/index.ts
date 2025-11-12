@@ -2,6 +2,7 @@
  * Public API for @fancytrader/shared
  * Keep exports minimal to avoid duplicate symbol conflicts.
  */
+export * from "./env.server";
 export * from "./trading";
 export {
   directionSchema,
