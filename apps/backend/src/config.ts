@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/**
+ * Prefer `CORS_ALLOWLIST`; `ALLOWED_ORIGINS` exists for backward compatibility.
+ */
 const defaultAllowedOrigins =
   process.env.ALLOWED_ORIGINS ??
   process.env.CORS_ALLOWLIST ??
