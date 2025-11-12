@@ -1,35 +1,46 @@
 import React from "react";
-import { useReadyz } from "../hooks/useReadyz";
-import { useSession } from "../hooks/useSession";
-import { useMockMode } from "../hooks/useMockMode";
 
-type Props = {
-  apiBase: string;
-};
+export type ConnectionPhase = "premarket" | "regular" | "aftermarket" | "closed";
+export type HealthStatus = "healthy" | "degraded" | "down" | "unknown";
 
-export default function HealthBanner({ apiBase }: Props) {
-  const mockMode = useMockMode();
-  const { phase } = useSession();
-  const readyz = useReadyz(5000, apiBase, { sessionPhase: phase, mockMode });
+export interface HealthBannerProps {
+  status?: HealthStatus;
+  reason?: string | null;
+  phase?: ConnectionPhase;
+  onRetry?: () => void;
+  hidden?: boolean;
+}
 
-  if (mockMode || phase === "closed" || readyz.status !== "down") {
-    return null;
-  }
+export const HealthBanner: React.FC<HealthBannerProps> = ({
+  status = "unknown",
+  reason = null,
+  phase = "closed",
+  onRetry,
+  hidden = false,
+}) => {
+  if (hidden) return null;
+
+  const label =
+    status === "healthy"
+      ? "Connected"
+      : status === "degraded"
+      ? "Degraded"
+      : status === "down"
+      ? "Offline"
+      : "Unknown";
 
   return (
-    <div className="bg-rose-600 text-white px-3 py-2 text-sm flex items-center justify-between">
-      <div className="font-medium">
-        Stream: Down
-        <span className="opacity-90 ml-2">
-          ({readyz.reason ?? "Connection issue"})
-        </span>
+    <div role="status" data-testid="health-banner" className="border rounded-md px-3 py-2 text-sm">
+      <div className="flex items-center justify-between">
+        <div className="font-medium">{label}</div>
+        {onRetry && (
+          <button className="rounded-md border px-2 py-1" onClick={onRetry}>
+            Try again
+          </button>
+        )}
       </div>
-      <button
-        className="bg-white/15 hover:bg-white/25 transition rounded px-2 py-1 text-xs"
-        onClick={() => window.location.reload()}
-      >
-        Refresh
-      </button>
+      {reason ? <div className="mt-1 opacity-80">{reason}</div> : null}
+      <div className="sr-only">Phase: {phase}</div>
     </div>
   );
-}
+};

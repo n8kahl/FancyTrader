@@ -1,65 +1,44 @@
-import { useEffect, useRef, useState } from "react";
-import { getBackendUrl } from "../utils/env";
+import { useEffect, useState } from "react";
 
-export type SessionPhase = "pre" | "regular" | "after" | "closed" | "unknown";
+export type MarketSession = "premarket" | "regular" | "aftermarket" | "closed";
 
-const mapSessionToPhase = (session?: string): SessionPhase => {
-  if (!session) return "unknown";
-  const normalized = session.toLowerCase();
-  if (normalized.includes("early") || normalized.includes("pre")) return "pre";
-  if (normalized === "open" || normalized === "regular") return "regular";
-  if (normalized.includes("late") || normalized.includes("after")) return "after";
-  if (normalized === "closed") return "closed";
-  return "unknown";
-};
+type SessionPayload = { session?: string };
 
-export function useSession(pollMs = 30000, baseUrl?: string) {
-  const [phase, setPhase] = useState<SessionPhase>("unknown");
-  const timer = useRef<number>();
-  const controller = useRef<AbortController>();
-  const url = baseUrl?.trim() ? baseUrl : getBackendUrl();
+function normalizeSession(s: string | undefined): MarketSession {
+  const n = String(s ?? "closed").toLowerCase();
+  return (["premarket", "regular", "aftermarket", "closed"] as const).includes(n as any)
+    ? (n as MarketSession)
+    : "closed";
+}
+
+export function useSession() {
+  const [session, setSession] = useState<MarketSession>("closed");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const fetchPhase = async () => {
-      controller.current?.abort();
-      controller.current = new AbortController();
+    let alive = true;
+    const run = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const response = await fetch(`${url}/api/market/status`, {
-          cache: "no-store",
-          signal: controller.current.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`Status ${response.status}`);
-        }
-        const json = await response.json();
-        if (!cancelled) {
-          setPhase(mapSessionToPhase(json.session));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setPhase("unknown");
-        }
+        const res = await fetch("/api/market/status");
+        const json = (await res.json()) as SessionPayload;
+        if (!alive) return;
+        setSession(normalizeSession(json.session));
+      } catch (e: any) {
+        if (!alive) return;
+        setError(e?.message ?? "session_failed");
       } finally {
-        if (!cancelled) {
-          timer.current = globalThis.setTimeout(fetchPhase, pollMs);
-        }
+        if (!alive) return;
+        setLoading(false);
       }
     };
-
-    fetchPhase();
-
+    run();
     return () => {
-      cancelled = true;
-      if (controller.current) {
-        controller.current.abort();
-      }
-      if (timer.current) {
-        globalThis.clearTimeout(timer.current);
-      }
+      alive = false;
     };
-  }, [url, pollMs]);
+  }, []);
 
-  return { phase };
+  return { session, loading, error };
 }

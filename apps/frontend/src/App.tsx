@@ -1,5 +1,5 @@
 import ConnectionStatus from "./components/ConnectionStatus";
-import HealthBanner from "./components/HealthBanner";
+import { HealthBanner } from "./components/HealthBanner";
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { TradeCard } from "./components/TradeCard";
@@ -52,7 +52,6 @@ import { generateMockTrades } from "./utils/mockTradeGenerator";
 import { useBackendConnection } from "./hooks/useBackendConnection";
 import { useReadyz } from "./hooks/useReadyz";
 import { useSession } from "./hooks/useSession";
-import { MockModeProvider } from "./hooks/useMockMode";
 import { displayWelcomeMessage } from "./utils/welcomeMessage";
 import { logger } from "./utils/logger";
 import { getMode, isDev, getBackendUrl, getBackendWsUrl } from "./utils/env";
@@ -184,20 +183,19 @@ export default function App({ backendDeps }: AppProps = {}) {
     manualReconnect,
   } = useBackendConnection();
 
-  const sessionForAnnounce = useSession();
-  const readyzAnnounce = useReadyz(5000, getBackendUrl(), {
-    sessionPhase: sessionForAnnounce.phase,
-    mockMode: useMockData,
-  });
+  const sessionInfo = useSession();
+  const readyz = useReadyz(5000);
   const [announcement, setAnnouncement] = useState("");
-  const previousReadyzStatus = useRef<"ok" | "unknown" | "down">("unknown");
+  const wasDownRef = useRef(false);
 
   useEffect(() => {
-    if (previousReadyzStatus.current === "down" && readyzAnnounce.status === "ok") {
-      setAnnouncement("Realtime connection recovered");
+    if (!readyz.loading) {
+      if (wasDownRef.current && readyz.ready) {
+        setAnnouncement("Realtime connection recovered");
+      }
+      wasDownRef.current = !readyz.ready;
     }
-    previousReadyzStatus.current = readyzAnnounce.status;
-  }, [readyzAnnounce.status]);
+  }, [readyz.loading, readyz.ready]);
 
   // Options Trading State
   const [contractSelectorTrade, setContractSelectorTrade] = useState<Trade | null>(null);
@@ -805,19 +803,28 @@ const activeTrades: UiTrade[] = trades
     monitoring: filteredTrades.filter((t) => t.status === "MONITORING").length,
   };
 
+  const healthStatus = readyz.loading ? "unknown" : readyz.ready ? "healthy" : "down";
+  const healthReason = readyz.error ?? sessionInfo.error ?? undefined;
+  const hiddenBanner = sessionInfo.session === "closed";
+
   return (
-    <MockModeProvider value={useMockData}>
-      <div className="min-h-screen bg-background flex flex-col">
-        <Toaster position="top-right" richColors />
-        <ConnectionStatus
-          state={connectionStatus}
-          reason={connectionReason ?? undefined}
-          onRetry={manualReconnect}
-        />
-        <div className="sr-only" aria-live="polite" role="status">
-          {announcement}
-        </div>
-        <HealthBanner apiBase={getBackendUrl()} />
+    <div className="min-h-screen bg-background flex flex-col">
+      <Toaster position="top-right" richColors />
+      <ConnectionStatus
+        state={connectionStatus}
+        reason={connectionReason ?? undefined}
+        onRetry={manualReconnect}
+      />
+      <div className="sr-only" aria-live="polite" role="status">
+        {announcement}
+      </div>
+      <HealthBanner
+        status={healthStatus}
+        reason={healthReason}
+        phase={sessionInfo.session}
+        onRetry={() => window.location.reload()}
+        hidden={hiddenBanner}
+      />
 
       {/* Header */}
       <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
