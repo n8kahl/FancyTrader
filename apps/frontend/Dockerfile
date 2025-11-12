@@ -20,10 +20,12 @@ RUN pnpm --filter @fancytrader/shared build && \
 
 FROM nginx:alpine AS runtime
 
-COPY --from=builder /app/apps/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# Use a template so runtime PORT can be injected.
+COPY --from=builder /app/apps/frontend/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=builder /app/apps/frontend/dist /usr/share/nginx/html
 
-EXPOSE 80
+ENV PORT=8080
+EXPOSE 8080
 RUN chmod -R 755 /usr/share/nginx/html
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/bin/sh", "-c", "envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && exec nginx -g 'daemon off;'"]
