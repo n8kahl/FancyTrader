@@ -14,15 +14,9 @@ export const metrics: Counters = {
   startedAt: Date.now(),
 };
 
-export const register = new client.Registry();
-client.collectDefaultMetrics({ register });
+export const register = client.register;
 
-export const httpRequests = new client.Counter({
-  name: "http_requests_total",
-  help: "HTTP requests by route, method, and status",
-  labelNames: ["route", "method", "status"] as const,
-});
-register.registerMetric(httpRequests);
+export let httpRequests: client.Counter;
 
 const normalizePath = (path: string): string => path.replace(/:\w+/g, ":param");
 
@@ -61,46 +55,73 @@ export function incPolygonWsMessages(count = 1): void {
 }
 
 // === Massive WebSocket metrics ===
-export const massiveWsConnected = new client.Gauge({
-  name: "massive_ws_connected",
-  help: "1 if Massive WS is connected, else 0",
-});
+export let massiveWsConnected: client.Gauge;
+export let massiveWsConnectsTotal: client.Counter;
+export let massiveWsDisconnectsTotal: client.Counter;
+export let massiveWsMessagesTotal: client.Counter;
+export let massiveWsErrorsTotal: client.Counter;
+export let massiveWsHeartbeatMissedTotal: client.Counter;
+export let massiveWsReconnectsTotal: client.Counter;
 
-export const massiveWsConnectsTotal = new client.Counter({
-  name: "massive_ws_connects_total",
-  help: "Total Massive WS open/connect events",
-});
+let metricsConfigured = false;
 
-export const massiveWsDisconnectsTotal = new client.Counter({
-  name: "massive_ws_disconnects_total",
-  help: "Total Massive WS close/disconnect events",
-});
+function configureMetrics(): void {
+  if (metricsConfigured) {
+    return;
+  }
+  register.clear();
+  client.collectDefaultMetrics({ register });
 
-export const massiveWsMessagesTotal = new client.Counter({
-  name: "massive_ws_messages_total",
-  help: "Total Massive WS messages received",
-});
+  httpRequests = new client.Counter({
+    name: "http_requests_total",
+    help: "HTTP requests by route, method, and status",
+    labelNames: ["route", "method", "status"] as const,
+    registers: [register],
+  });
 
-export const massiveWsErrorsTotal = new client.Counter({
-  name: "massive_ws_errors_total",
-  help: "Total Massive WS error events",
-});
+  massiveWsConnected = new client.Gauge({
+    name: "massive_ws_connected",
+    help: "1 if Massive WS is connected, else 0",
+    registers: [register],
+  });
 
-export const massiveWsHeartbeatMissedTotal = new client.Counter({
-  name: "massive_ws_heartbeat_missed_total",
-  help: "Total Massive WS heartbeat_missed events",
-});
+  massiveWsConnectsTotal = new client.Counter({
+    name: "massive_ws_connects_total",
+    help: "Total Massive WS open/connect events",
+    registers: [register],
+  });
 
-export const massiveWsReconnectsTotal = new client.Counter({
-  name: "massive_ws_reconnects_total",
-  help: "Total Massive WS forced restarts by watchdog/backoff",
-});
+  massiveWsDisconnectsTotal = new client.Counter({
+    name: "massive_ws_disconnects_total",
+    help: "Total Massive WS close/disconnect events",
+    registers: [register],
+  });
 
-// Make sure they're registered
-register.registerMetric(massiveWsConnected);
-register.registerMetric(massiveWsConnectsTotal);
-register.registerMetric(massiveWsDisconnectsTotal);
-register.registerMetric(massiveWsMessagesTotal);
-register.registerMetric(massiveWsErrorsTotal);
-register.registerMetric(massiveWsHeartbeatMissedTotal);
-register.registerMetric(massiveWsReconnectsTotal);
+  massiveWsMessagesTotal = new client.Counter({
+    name: "massive_ws_messages_total",
+    help: "Total Massive WS messages received",
+    registers: [register],
+  });
+
+  massiveWsErrorsTotal = new client.Counter({
+    name: "massive_ws_errors_total",
+    help: "Total Massive WS error events",
+    registers: [register],
+  });
+
+  massiveWsHeartbeatMissedTotal = new client.Counter({
+    name: "massive_ws_heartbeat_missed_total",
+    help: "Total Massive WS heartbeat_missed events",
+    registers: [register],
+  });
+
+  massiveWsReconnectsTotal = new client.Counter({
+    name: "massive_ws_reconnects_total",
+    help: "Total Massive WS forced restarts by watchdog/backoff",
+    registers: [register],
+  });
+
+  metricsConfigured = true;
+}
+
+configureMetrics();

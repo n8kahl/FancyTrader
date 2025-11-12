@@ -3,6 +3,7 @@
  * Keep exports minimal to avoid duplicate symbol conflicts.
  */
 export * from "./env.server";
+export * from "./http/client";
 export * from "./trading";
 export {
   directionSchema,

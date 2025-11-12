@@ -41,7 +41,7 @@ An AI “Trading Coach” that generates deterministic, risk-aware trade plans w
 **Done when**
 - Backend/worker boot fails on invalid env; Polygon never used when disabled.
 - WS obeys env limits; idle cleanup works; oversize payloads rejected.
-- `/api/snapshots?symbol=...` returns LKG in closed/premarket.
+  - `/api/snapshots?symbol=AAPL` returns LKG in closed/premarket.
 - CI gates: lint, typecheck, tests, build; dep audit runs.
 
 ### Sprint 2 — Strategy & plans (P0/P1)

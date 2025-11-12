@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "@jest/globals";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "@jest/globals";
 import nock from "nock";
 import request from "supertest";
 import type { Express } from "express";
@@ -27,10 +27,10 @@ const originalEnv = {
 };
 
 const buildApp = async (): Promise<Express> => {
-  jest.resetModules();
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { createApp } = require("../src/app") as typeof import("../src/app");
-  return (await createApp()).app;
+  vi.resetModules();
+  const { createApp } = await import("../src/app");
+  const { app } = await createApp();
+  return app;
 };
 
 const setDefaultEnv = (): void => {

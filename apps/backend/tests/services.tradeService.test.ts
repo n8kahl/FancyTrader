@@ -1,6 +1,6 @@
 process.env.TRADES_MEMORY_STORE = "false";
 
-jest.mock("../src/lib/supabase", () => {
+  vi.mock("../src/lib/supabase.ts", () => {
   let rows: any[] = [];
 
   const matches = (row: any, filters: Record<string, any>) =>
@@ -90,12 +90,13 @@ jest.mock("../src/lib/supabase", () => {
 
 import { createTrade, listTrades, getTrade, updateTrade, deleteTrade } from "../src/services/tradeService";
 
-const supabaseMock = require("../src/lib/supabase");
+let supabaseMock: any;
 
 describe("tradeService", () => {
   const owner = "11111111-1111-1111-1111-111111111111";
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    supabaseMock = await import("../src/lib/supabase.ts");
     supabaseMock.__reset();
   });
 

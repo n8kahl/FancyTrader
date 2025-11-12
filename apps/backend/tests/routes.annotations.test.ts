@@ -1,13 +1,15 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { jest } from "./jest-globals";
 import type { Express } from "express";
 import request from "supertest";
 
 const userId = "11111111-1111-1111-1111-111111111111";
 
 async function loadApp(): Promise<Express> {
-  const { createApp } = require("../src/app");
-  return (await createApp()).app;
+  const { createApp } = await import("../src/app");
+  const { app } = await createApp();
+  return app;
 }
 
 describe("/api/chart/annotations - memory fallback", () => {
@@ -15,7 +17,7 @@ describe("/api/chart/annotations - memory fallback", () => {
 
   beforeEach(async () => {
     process.env.ANNOTATIONS_MEMORY_STORE = "true";
-    jest.resetModules();
+    vi.resetModules();
     app = await loadApp();
   });
 
@@ -62,13 +64,13 @@ describe("/api/chart/annotations - service wiring", () => {
 
   beforeEach(async () => {
     process.env.ANNOTATIONS_MEMORY_STORE = "false";
-    jest.resetModules();
-    jest.doMock("../src/services/annotationService", () => {
-      const actual = jest.requireActual("../src/services/annotationService");
+    vi.resetModules();
+    const actual = await vi.importActual("../src/services/annotationService");
+    vi.doMock("../src/services/annotationService", () => {
       const store: any[] = [];
       return {
         ...actual,
-        listAnnotations: jest.fn(async (owner: string) =>
+        listAnnotations: vi.fn(async (owner: string) =>
           store.filter((item) => item.owner === owner)
         ),
         createAnnotation: jest.fn(async (owner: string, payload: any) => {
@@ -84,13 +86,13 @@ describe("/api/chart/annotations - service wiring", () => {
           store.unshift(record);
           return record;
         }),
-        updateAnnotation: jest.fn(async (owner: string, id: string, partial: any) => {
+        updateAnnotation: vi.fn(async (owner: string, id: string, partial: any) => {
           const idx = store.findIndex((item) => item.owner === owner && item.id === id);
           if (idx === -1) return null;
           store[idx] = { ...store[idx], ...partial };
           return store[idx];
         }),
-        deleteAnnotation: jest.fn(async (owner: string, id: string) => {
+        deleteAnnotation: vi.fn(async (owner: string, id: string) => {
           const before = store.length;
           const next = store.filter((item) => !(item.owner === owner && item.id === id));
           store.splice(0, store.length, ...next);
@@ -102,7 +104,7 @@ describe("/api/chart/annotations - service wiring", () => {
   });
 
   afterEach(() => {
-    jest.dontMock("../src/services/annotationService");
+    vi.unmock("../src/services/annotationService");
   });
 
   it("delegates to service layer", async () => {

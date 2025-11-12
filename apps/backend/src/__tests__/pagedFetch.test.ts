@@ -1,9 +1,10 @@
 import axios from "axios";
 import type { AxiosResponse } from "axios";
+import { vi } from "vitest";
 import { followNextUrls, encodeCursor, decodeCursor } from "../utils/pagedFetch.js";
 
-jest.mock("axios");
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+vi.mock("axios");
+const mockedAxios = vi.mocked(axios, true);
 
 type PageRecord = { n: number };
 

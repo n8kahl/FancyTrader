@@ -7,9 +7,14 @@ function parseAllowlist(): string[] {
     .filter(Boolean);
 }
 
+function normalizeOrigin(value: string): string {
+  return value.replace(/\/+$/, "").toLowerCase();
+}
+
 export function isAllowedOrigin(origin: string | undefined): boolean {
   if (!origin) return false;
-  const allowed = parseAllowlist();
+  const allowed = parseAllowlist().map(normalizeOrigin).filter(Boolean);
   if (allowed.length === 0) return true;
-  return allowed.includes(origin);
+  const normalized = normalizeOrigin(origin);
+  return allowed.some((candidate) => normalized === candidate || normalized.startsWith(`${candidate}/`));
 }

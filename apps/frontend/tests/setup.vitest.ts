@@ -30,16 +30,16 @@ class RO {
 }
 (globalThis as any).ResizeObserver ||= RO;
 
-// ---- WebSocket mock with EventTarget-like API ----
+// ---- controllable web socket for tests ----
 type Listener = (ev: any) => void;
 
-class MockWebSocket {
+class ControlledWebSocket {
   static CONNECTING = 0;
   static OPEN = 1;
   static CLOSING = 2;
   static CLOSED = 3;
 
-  readyState = MockWebSocket.OPEN;
+  readyState = ControlledWebSocket.OPEN;
   url: string;
 
   onopen: Listener | null = null;
@@ -51,10 +51,8 @@ class MockWebSocket {
 
   constructor(url: string) {
     this.url = url;
-    (globalThis as any).__lastWebSocketInstance = this;
-    queueMicrotask(() => {
-      this.dispatchEvent("open", {});
-    });
+    (globalThis as any).__WS__ = this;
+    queueMicrotask(() => this.dispatchEvent("open", {}));
   }
 
   addEventListener(type: string, cb: Listener) {
@@ -66,7 +64,7 @@ class MockWebSocket {
     this.listeners.get(type)?.delete(cb);
   }
 
-  dispatchEvent(type: string, ev: any) {
+  private dispatchEvent(type: string, ev: any) {
     const handler = (this as any)[`on${type}`] as Listener | null;
     if (handler) handler(ev);
     for (const cb of this.listeners.get(type) ?? []) cb(ev);
@@ -76,7 +74,7 @@ class MockWebSocket {
   send = vi.fn();
 
   close = vi.fn((code = 1000, reason = "") => {
-    this.readyState = MockWebSocket.CLOSED;
+    this.readyState = ControlledWebSocket.CLOSED;
     this.dispatchEvent("close", { code, reason });
   });
 
@@ -88,7 +86,7 @@ class MockWebSocket {
     this.dispatchEvent("error", err ?? new Error("ws_error"));
   }
 }
-(globalThis as any).WebSocket = MockWebSocket as any;
+(globalThis as any).WebSocket = ControlledWebSocket as any;
 
 if (!("fetch" in globalThis)) {
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL) =>

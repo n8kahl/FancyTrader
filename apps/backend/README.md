@@ -204,7 +204,7 @@ ws://localhost:8080/ws
       "stopLoss": 148.50,
       "targets": [151.50, 153.00],
       "confluenceScore": 5,
-      "confluenceFactors": [...]
+      "confluenceFactors": ["trendline", "volume", "momentum"]
     }
   },
   "timestamp": 1234567890
@@ -256,7 +256,7 @@ Automatic Discord notifications for:
 Configure your Discord webhook in `.env`:
 
 ```
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/<your-webhook-id>/<your-webhook-token>
 DISCORD_ENABLED=true
 ```
 

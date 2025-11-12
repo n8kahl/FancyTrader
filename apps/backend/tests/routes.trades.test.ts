@@ -1,13 +1,15 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { jest } from "./jest-globals";
 import request from "supertest";
 import type { Express } from "express";
 
 const userId = "11111111-1111-1111-1111-111111111111";
 
 async function loadApp(): Promise<Express> {
-  const { createApp } = require("../src/app");
-  return (await createApp()).app;
+  const { createApp } = await import("../src/app");
+  const { app } = await createApp();
+  return app;
 }
 
 describe("/api/trades route - memory fallback", () => {
@@ -18,7 +20,7 @@ describe("/api/trades route - memory fallback", () => {
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_KEY;
     delete process.env.SUPABASE_ANON_KEY;
-    jest.resetModules();
+    vi.resetModules();
     app = await loadApp();
   });
 
@@ -54,15 +56,15 @@ describe("/api/trades route - supabase adapter", () => {
 
   beforeEach(async () => {
     process.env.TRADES_MEMORY_STORE = "false";
-    jest.resetModules();
-    jest.doMock("../src/services/tradeService", () => {
-      const actual = jest.requireActual("../src/services/tradeService");
+    vi.resetModules();
+    const actual = await vi.importActual("../src/services/tradeService");
+    vi.doMock("../src/services/tradeService", () => {
       let store: any[] = [];
       const clone = () => store.map((t) => ({ ...t }));
       return {
         ...actual,
-        listTrades: jest.fn(async (owner: string) => clone().filter((t) => t.owner === owner)),
-        createTrade: jest.fn(async (owner: string, payload: any) => {
+        listTrades: vi.fn(async (owner: string) => clone().filter((t) => t.owner === owner)),
+        createTrade: vi.fn(async (owner: string, payload: any) => {
           const record = {
             id: `mock-${store.length}`,
             owner,
@@ -74,14 +76,14 @@ describe("/api/trades route - supabase adapter", () => {
           store = [record, ...store];
           return record;
         }),
-        getTrade: jest.fn(async (owner: string, id: string) => store.find((t) => t.owner === owner && t.id === id) ?? null),
-        updateTrade: jest.fn(async (owner: string, id: string, partial: any) => {
+        getTrade: vi.fn(async (owner: string, id: string) => store.find((t) => t.owner === owner && t.id === id) ?? null),
+        updateTrade: vi.fn(async (owner: string, id: string, partial: any) => {
           const idx = store.findIndex((t) => t.owner === owner && t.id === id);
           if (idx === -1) return null;
           store[idx] = { ...store[idx], ...partial };
           return store[idx];
         }),
-        deleteTrade: jest.fn(async (owner: string, id: string) => {
+        deleteTrade: vi.fn(async (owner: string, id: string) => {
           const before = store.length;
           store = store.filter((t) => !(t.owner === owner && t.id === id));
           return store.length !== before;
@@ -92,7 +94,7 @@ describe("/api/trades route - supabase adapter", () => {
   });
 
   afterEach(() => {
-    jest.dontMock("../src/services/tradeService");
+    vi.unmock("../src/services/tradeService");
   });
 
   it("pipes requests through tradeService", async () => {

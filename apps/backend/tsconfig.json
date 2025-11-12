@@ -10,7 +10,12 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "strict": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@fancytrader/shared": ["../packages/shared/src/index.ts"],
+      "@fancytrader/shared/*": ["../packages/shared/src/*"]
+    }
   },
   "include": ["src"],
   "exclude": ["dist", "node_modules", "test", "**/*.test.ts", "**/*.spec.ts"]

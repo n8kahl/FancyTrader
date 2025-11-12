@@ -44,7 +44,7 @@ const buildMockServices = (): AppServices => {
 };
 
 describe("market + options routes", () => {
-  const polygonApi = "https://api.massive.com";
+  const polygonApi = process.env.MASSIVE_REST_BASE ?? "https://api.massive.com";
   const services = buildMockServices();
   let app: Express;
 
@@ -69,7 +69,7 @@ describe("market + options routes", () => {
     { market: "closed", expected: "closed" },
   ])("normalizes %s session", async ({ market, expected }) => {
     nock(polygonApi)
-      .get("/v1/marketstatus/now")
+      .get("/v3/market/status")
       .query({ apiKey: "test_key" })
       .reply(200, { market, next_open: "2024-05-02T13:30:00Z", next_close: "2024-05-02T20:00:00Z" });
 

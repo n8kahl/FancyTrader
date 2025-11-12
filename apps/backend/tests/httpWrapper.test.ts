@@ -2,7 +2,7 @@ import { describe, expect, it, afterEach } from "@jest/globals";
 import nock from "nock";
 import { HttpClient } from "../src/utils/http";
 
-const HOST = "https://api.massive.com";
+const HOST = process.env.MASSIVE_REST_BASE ?? "https://api.massive.com";
 
 describe("HttpClient", () => {
   afterEach(() => {

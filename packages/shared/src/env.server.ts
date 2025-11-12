@@ -4,6 +4,11 @@ import { z } from "zod";
  * Canonical server-side environment schema for all services.
  * Fail fast in production if anything critical is missing.
  */
+const isTestEnv = process.env.NODE_ENV === "test";
+
+const valueOrFallback = (envKey: string, fallback: string) => () => process.env[envKey] ?? fallback;
+const optionalUrlOrEmpty = z.string().url().or(z.literal(""));
+
 const ServerEnvSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -21,7 +26,7 @@ const ServerEnvSchema = z
     MASSIVE_REST_BASE: z.string().url().default("https://api.massive.com"),
     MASSIVE_WS_BASE: z.string().url().default("wss://socket.massive.com"),
     MASSIVE_WS_CLUSTER: z.string().default("options"),
-    MASSIVE_API_KEY: z.string().min(1),
+    MASSIVE_API_KEY: z.string().min(1).default(valueOrFallback("MASSIVE_API_KEY", isTestEnv ? "test_key" : "")),
     MASSIVE_AUTH_MODE: z.enum(["query", "header"]).default("query"),
 
     // Feature flags
@@ -41,9 +46,9 @@ const ServerEnvSchema = z
     RATE_LIMIT_WRITE_MAX: z.coerce.number().int().positive().default(25),
 
     // Supabase
-    SUPABASE_URL: z.string().url().optional().default(""),
-    SUPABASE_SERVICE_KEY: z.string().optional().default(""),
-    SUPABASE_ANON_KEY: z.string().optional().default(""),
+    SUPABASE_URL: optionalUrlOrEmpty.default(valueOrFallback("SUPABASE_URL", isTestEnv ? "https://example.supabase.co" : "")),
+    SUPABASE_SERVICE_KEY: z.string().default(valueOrFallback("SUPABASE_SERVICE_KEY", isTestEnv ? "supabase-service" : "")),
+    SUPABASE_ANON_KEY: z.string().default(valueOrFallback("SUPABASE_ANON_KEY", isTestEnv ? "supabase-anon" : "")),
 
     // Discord notifications
     DISCORD_ENABLED: z.coerce.boolean().default(false),

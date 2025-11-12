@@ -1,4 +1,4 @@
-import { describe, expect, it, afterAll } from "@jest/globals";
+import { describe, expect, it, afterAll, vi } from "@jest/globals";
 import request from "supertest";
 import type { Express } from "express";
 
@@ -23,23 +23,10 @@ const sharePayload = {
 };
 
 const buildApp = async (): Promise<Express> => {
-  let built: Express | undefined;
-  let builtPromise: Promise<void> | undefined;
-  jest.isolateModules(() => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { createApp } = require("../src/app") as typeof import("../src/app");
-    builtPromise = createApp().then(({ app }) => {
-      built = app;
-    });
-  });
-  if (!builtPromise) {
-    throw new Error("Failed to initialize app builder");
-  }
-  await builtPromise;
-  if (!built) {
-    throw new Error("Failed to build app instance");
-  }
-  return built;
+  await vi.resetModules();
+  const { createApp } = await import("../src/app");
+  const { app } = await createApp();
+  return app;
 };
 
 afterAll(() => {

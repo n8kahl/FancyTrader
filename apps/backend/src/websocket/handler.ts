@@ -215,6 +215,13 @@ export function setupWebSocketHandler(
         payload: { setups: activeSetups.map((setup) => ({ ...setup })) },
         timestamp: Date.now(),
       });
+      activeSetups.forEach((setup) => {
+        sendMessage(ws, {
+          type: "SETUP_UPDATE",
+          payload: { action: "new", setup: { ...setup } },
+          timestamp: Date.now(),
+        });
+      });
     }
   });
 

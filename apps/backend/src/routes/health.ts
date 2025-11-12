@@ -1,9 +1,9 @@
 import { Router } from "express";
-import { getMarketStatusNow } from "../services/massiveStatus.js";
 import { register } from "../utils/metrics.js";
 import { requireAdminKey } from "../middleware/adminKey.js";
 import { Config } from "../config.js";
 import { serverEnv } from "@fancytrader/shared/server";
+import { PolygonClient } from "../services/massiveClient.js";
 
 declare global {
   // populated by your WS server on ready
@@ -14,6 +14,7 @@ declare global {
 }
 
 const router = Router();
+const polygonClient = new PolygonClient();
 
 const version = process.env.npm_package_version ?? "0.0.0";
 const FRESHNESS_THRESHOLD_MS = 90_000;
@@ -52,7 +53,7 @@ router.get("/readyz", async (_req, res) => {
   }
 
   try {
-    await getMarketStatusNow();
+    await polygonClient.getMarketStatus();
     checks.restReachable = true;
   } catch {
     checks.restReachable = false;

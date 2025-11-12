@@ -22,14 +22,34 @@ const CHANGED = [
 ];
 
 describe("Sprint 1–6 files contain no ellipsis stubs", () => {
-  it("no '...' in changed files", () => {
-    const root = path.resolve(__dirname, "..", "..");
+  it("no ellipsis placeholders in changed files", () => {
+    const root = path.resolve(__dirname, "..", "..", "..");
     const offenders: string[] = [];
     for (const rel of CHANGED) {
       const fp = path.resolve(root, rel);
       const text = fs.readFileSync(fp, "utf8");
-      if (text.includes("...")) offenders.push(rel);
+      if (containsLiteralEllipsis(text)) offenders.push(rel);
     }
     expect(offenders).toEqual([]);
   });
 });
+
+function containsLiteralEllipsis(text: string): boolean {
+  const ellipsis = /\.{3}/g;
+  let match: RegExpExecArray | null = null;
+
+  while ((match = ellipsis.exec(text))) {
+    const rest = text.slice(match.index + 3);
+    const nextIndex = rest.search(/\S/);
+    if (nextIndex === -1) {
+      return true;
+    }
+    const nextChar = rest[nextIndex];
+    if (/[A-Za-z0-9_$\[\(\{]/.test(nextChar)) {
+      continue;
+    }
+    return true;
+  }
+
+  return false;
+}

@@ -279,7 +279,7 @@ export class MassiveRestClient {
 
   async getMarketStatus(): Promise<unknown> {
     try {
-      const response = await this.http.get("/v1/marketstatus/now");
+      const response = await this.http.get("/v3/market/status");
       incMassiveRest(true, response.status);
       return marketStatusSchema.parse(response.data);
     } catch (error: unknown) {

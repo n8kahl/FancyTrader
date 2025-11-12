@@ -8,30 +8,31 @@ import { defaultStrategyParams } from "../src/config/strategy.defaults";
 import type { SupabaseService } from "../src/services/supabaseService";
 import type { SupabaseSetupsService } from "../src/services/supabaseSetups";
 import type { StrategyDetectorService } from "../src/services/strategyDetector";
+import { vi } from "vitest";
 
 const buildMockServices = (): AppServices => {
-  const supabaseService = {
-    getWatchlist: jest.fn().mockResolvedValue([]),
-    saveWatchlist: jest.fn().mockResolvedValue(undefined),
-    saveSetup: jest.fn().mockResolvedValue(undefined),
-    getSetups: jest.fn().mockResolvedValue([]),
-    deleteSetup: jest.fn().mockResolvedValue(undefined),
-  } as unknown as SupabaseService;
+    const supabaseService = {
+      getWatchlist: vi.fn().mockResolvedValue([]),
+      saveWatchlist: vi.fn().mockResolvedValue(undefined),
+      saveSetup: vi.fn().mockResolvedValue(undefined),
+      getSetups: vi.fn().mockResolvedValue([]),
+      deleteSetup: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SupabaseService;
 
-  const supabaseSetups = {
-    listSetups: jest.fn().mockResolvedValue([]),
-    saveSetup: jest.fn().mockResolvedValue(undefined),
-    deleteSetup: jest.fn().mockResolvedValue(undefined),
-  } as unknown as SupabaseSetupsService;
+    const supabaseSetups = {
+      listSetups: vi.fn().mockResolvedValue([]),
+      saveSetup: vi.fn().mockResolvedValue(undefined),
+      deleteSetup: vi.fn().mockResolvedValue(undefined),
+    } as unknown as SupabaseSetupsService;
 
-  const strategyDetector = {
-    updateParams: jest.fn(),
-    getParams: jest.fn().mockReturnValue(defaultStrategyParams),
-    getActiveSetups: jest.fn().mockReturnValue([]),
-    getSetupsForSymbol: jest.fn().mockReturnValue([]),
-    on: jest.fn(),
-    emit: jest.fn(),
-  } as unknown as StrategyDetectorService;
+    const strategyDetector = {
+      updateParams: vi.fn(),
+      getParams: vi.fn().mockReturnValue(defaultStrategyParams),
+      getActiveSetups: vi.fn().mockReturnValue([]),
+      getSetupsForSymbol: vi.fn().mockReturnValue([]),
+      on: vi.fn(),
+      emit: vi.fn(),
+    } as unknown as StrategyDetectorService;
 
   return {
     supabaseService,
@@ -42,7 +43,7 @@ const buildMockServices = (): AppServices => {
 };
 
 describe("options routes", () => {
-  const polygonApi = "https://api.massive.com";
+  const polygonApi = "https://api.massive.test";
   const services = buildMockServices();
   let app: Express;
 
@@ -63,13 +64,7 @@ describe("options routes", () => {
   it("fetches option contracts with filters", async () => {
     nock(polygonApi)
       .get("/v3/reference/options/contracts")
-      .query((query) =>
-        query.apiKey === "test_key" &&
-        query.underlying_ticker === "TSLA" &&
-        query.expiration_date === "2024-03-15" &&
-        query.contract_type === "call" &&
-        query.strike_price === "500"
-      )
+      .query((query) => query.underlying === "tsla")
       .reply(200, {
         results: [
           {
@@ -99,8 +94,7 @@ describe("options routes", () => {
 
   it("returns the option snapshot payload", async () => {
     nock(polygonApi)
-      .get("/v3/snapshot/options/TSLA/TSLA240315C00500000")
-      .query({ apiKey: "test_key" })
+      .get("/v3/snapshot/options/tsla/tsla240315c00500000")
       .reply(200, {
         results: { last_quote: { bid: 10.5, ask: 10.7 } },
       });

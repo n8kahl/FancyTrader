@@ -2,17 +2,22 @@ import { defineConfig } from "tsup";
 
 export default defineConfig([
   {
-    entry: ["src/index.ts", "src/env.server.ts", "src/client/massive.ts"],
+    entry: { "env.client": "src/env.client.ts" },
+    format: ["esm"],
     dts: true,
-    format: ["esm", "cjs"],
     target: "es2020",
     sourcemap: true,
     clean: true,
   },
   {
-    entry: ["src/env.client.ts"],
+    entry: {
+      "env.server": "src/env.server.ts",
+      index: "src/index.ts",
+      "client/massive": "src/client/massive.ts",
+      "http/client": "src/http/client.ts",
+    },
+    format: ["esm", "cjs"],
     dts: true,
-    format: ["esm"],
     target: "es2020",
     sourcemap: true,
     clean: false,

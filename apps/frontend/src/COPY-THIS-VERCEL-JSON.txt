@@ -1,7 +1,0 @@
-{
-  "outputDirectory": "build",
-  "installCommand": "rm -rf node_modules package-lock.json .npmrc && echo 'engine-strict=true' > .npmrc && echo 'legacy-peer-deps=false' >> .npmrc && npm install --force && npm list vite",
-  "buildCommand": "npx vite@5.4.11 build && ls -lh build/assets/*.css",
-  "framework": null,
-  "cache": []
-}

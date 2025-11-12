@@ -17,7 +17,7 @@ describe("supabase library bootstrap", () => {
     jest.resetModules();
     delete process.env.SUPABASE_URL;
     delete process.env.SUPABASE_SERVICE_KEY;
-    const lib = require("../src/lib/supabase");
+    const lib = await import("../src/lib/supabase.ts");
     expect(lib.supabaseAdmin).toBeNull();
     expect(() => lib.assertAdminClient()).toThrow();
   });
@@ -26,7 +26,7 @@ describe("supabase library bootstrap", () => {
     jest.resetModules();
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_ANON_KEY = "anon";
-    const lib = require("../src/lib/supabase");
+    const lib = await import("../src/lib/supabase.ts");
     expect(() => lib.supabaseForUser("token")).not.toThrow();
   });
 });

@@ -124,10 +124,10 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
 
   const corsOptions: cors.CorsOptions = {
     origin(origin, callback) {
-      if (!origin) {
-        callback(new Error("CORS blocked (origin missing)"), false);
-        return;
-      }
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
       if (isOriginAllowed(origin)) {
         callback(null, true);
         return;
@@ -175,8 +175,8 @@ export async function createApp(options: CreateAppOptions = {}): Promise<CreateA
 
   app.use(healthRouter);
   app.use(configRouter);
-  app.use("/api", healthRouter);
   app.use("/api", metricsRouter);
+  app.use("/api", healthRouter);
 
   app.use("/api/alerts", alertLimiter);
   app.use("/api/share", shareLimiter);

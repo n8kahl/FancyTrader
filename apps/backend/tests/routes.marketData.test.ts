@@ -34,7 +34,7 @@ describe("marketData routes", () => {
   };
 
   let app: Express;
-  const base = "https://api.massive.com";
+  const base = "https://api.massive.test";
 
   beforeAll(async () => {
     nock.disableNetConnect();
@@ -52,7 +52,9 @@ describe("marketData routes", () => {
 
   it("returns normalized market status", async () => {
     nock(base)
+      .matchHeader("authorization", "Bearer test_key")
       .get("/v3/market/status")
+      .query(true)
       .reply(200, { market: "after", next_open: "2024-05-02T13:30:00Z", next_close: "2024-05-02T20:00:00Z" });
 
     const res = await request(app).get("/api/market/status");
@@ -68,19 +70,26 @@ describe("marketData routes", () => {
 
   it("derives the previous close from minute aggs", async () => {
     nock(base)
-      .get(/\/v2\/aggs\/ticker\/SPY\/range\/1\/minute\/.*\/.*$/)
-      .query((query) => query.sort === "asc" && query.limit === "5000")
+      .matchHeader("authorization", "Bearer test_key")
+      .get("/v2/aggs/ticker/SPY/prev")
+      .query(true)
       .reply(200, {
-        results: [
-          { t: 1, o: 100, h: 101, l: 99.5, c: 100.5, v: 1000 },
-          { t: 2, o: 101, h: 102, l: 100.5, c: 101.5, v: 1200 },
-        ],
+        results: [{ t: 2, o: 101, h: 102, l: 100.5, c: 101.5, v: 1200 }],
       });
 
     const res = await request(app).get("/api/market/previous-close/spy");
 
     expect(res.status).toBe(200);
     expect(res.body.symbol).toBe("SPY");
-    expect(res.body.data).toEqual({ t: 2, o: 101, h: 102, l: 100.5, c: 101.5, v: 1200 });
+    expect(res.body.data).toEqual({
+      symbol: "SPY",
+      timestamp: 2,
+      open: 101,
+      high: 102,
+      low: 100.5,
+      close: 101.5,
+      volume: 1200,
+      vwap: undefined,
+    });
   });
 });

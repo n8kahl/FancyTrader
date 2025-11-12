@@ -9,7 +9,7 @@
 Goal: Clean separation frontend/backend, single source of truth for configs, pinned deps, environment validation.
 
 **Sprint 2 — Backend completion & hardening**
-Goal: Fill in `...` placeholders, finalize REST/WS APIs, robust env, error handling, structured logs, rate limiting.
+Goal: Finalize REST/WS APIs, robust env, error handling, structured logs, and rate limiting.
 
 **Sprint 3 — Frontend completion**
 Goal: Implement remaining UI, WS state handling, error/empty states, skeletons, feature toggles, integration with backend.
@@ -334,7 +334,7 @@ Use these when you’re ready to implement concrete files.
 
 **Prompt:**
 “Create `packages/shared/src/schemas.ts` with zod schemas:
-`WSOutbound = { type: "PRICE_UPDATE" | "SETUP_UPDATE" | ...; payload: ... }`,
+`WSOutbound = { type: "PRICE_UPDATE" | "SETUP_UPDATE" | "SERVICE_STATE"; payload: Record<string, unknown> }`,
 `WSInbound = { type: "SUBSCRIBE" | "UNSUBSCRIBE"; payload: { symbols: string[] } }`,
 `WatchlistItem`, `OptionContract`, `Snapshot`.
 Export both zod schemas and inferred TS types.”

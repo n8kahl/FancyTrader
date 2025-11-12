@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, describe, expect, it, vi } from "@jest/globals";
 import request from "supertest";
 import nock from "nock";
 import type { Express } from "express";
@@ -7,23 +7,10 @@ const base = "https://discord.com";
 const path = "/api/webhooks/123/custom";
 
 const buildApp = async (): Promise<Express> => {
-  let built: Express | undefined;
-  let builtPromise: Promise<void> | undefined;
-  jest.isolateModules(() => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { createApp } = require("../src/app") as typeof import("../src/app");
-    builtPromise = createApp().then(({ app }) => {
-      built = app;
-    });
-  });
-  if (!builtPromise) {
-    throw new Error("Failed to create app instance");
-  }
-  await builtPromise;
-  if (!built) {
-    throw new Error("Failed to create app instance");
-  }
-  return built;
+  vi.resetModules();
+  const { createApp } = await import("../src/app");
+  const { app } = await createApp();
+  return app;
 };
 
 const payload = {
