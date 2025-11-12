@@ -1,15 +1,10 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts"],
-  format: ["esm", "cjs"],
+  entry: ["src/index.ts", "src/env.server.ts", "src/env.client.ts"],
   dts: true,
+  format: ["esm", "cjs"],
+  target: "es2020", // supports import.meta
   sourcemap: true,
   clean: true,
-  target: "es2019",
-  outDir: "dist",
-  // ensure filenames line up with package.json: module -> index.js, main -> index.cjs
-  outExtension({ format }) {
-    return { js: format === "cjs" ? ".cjs" : ".js" };
-  },
 });
