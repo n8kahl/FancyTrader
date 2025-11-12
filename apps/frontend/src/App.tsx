@@ -37,7 +37,7 @@ import {
   Wifi,
   WifiOff,
 } from "lucide-react";
-import { Toaster } from "./components/ui/sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import { apiClient, ApiErrorEx } from "./services/apiClient";
 import { ALL_STRATEGIES } from "./config/strategies";
@@ -56,6 +56,7 @@ import { displayWelcomeMessage } from "./utils/welcomeMessage";
 import { logger } from "./utils/logger";
 import { getMode, isDev, getBackendUrl, getBackendWsUrl } from "./utils/env";
 import { DIAGNOSTICS_ENABLED } from "@/flags";
+import { MockModeProvider } from "@/providers/mock/MockModeProvider";
 import { runAction, type RunActionDeps } from "./flows/_shared/interaction";
 import { getWatchlistActions } from "./flows/watchlistFlow";
 import type { WatchlistActionId } from "./flows/watchlist_flow.schema";

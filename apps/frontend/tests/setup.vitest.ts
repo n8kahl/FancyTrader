@@ -51,6 +51,7 @@ class MockWebSocket {
 
   constructor(url: string) {
     this.url = url;
+    (globalThis as any).__lastWebSocketInstance = this;
     queueMicrotask(() => {
       this.dispatchEvent("open", {});
     });

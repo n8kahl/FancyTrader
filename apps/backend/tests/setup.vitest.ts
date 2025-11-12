@@ -10,6 +10,9 @@ import { vi } from "vitest";
   clearAllMocks: vi.clearAllMocks,
   resetAllMocks: vi.resetAllMocks,
   restoreAllMocks: vi.restoreAllMocks,
+  resetModules: vi.resetModules,
+  isolateModules: vi.fn((fn: () => any) => fn()),
+  dontMock: vi.fn(),
   // common helpers used in some suites:
   useFakeTimers: vi.useFakeTimers,
   useRealTimers: vi.useRealTimers,
