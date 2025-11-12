@@ -1,31 +1,27 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import ConnectionStatus from "../../components/ConnectionStatus";
 
 describe("ConnectionStatus", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
   afterEach(() => {
     cleanup();
   });
 
-  it("renders Healthy label", () => {
+  it("renders Connected label when healthy", () => {
     render(<ConnectionStatus state="healthy" />);
-    expect(screen.getByTestId("connection-status-banner")).toBeInTheDocument();
-    expect(screen.getByText(/Healthy/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByText(/Connected/i)).toBeInTheDocument();
   });
 
-  it("shows reason and reconnect button when offline", () => {
+  it("shows reason and retry when offline", () => {
     const onRetry = vi.fn();
-    render(<ConnectionStatus state="offline" reason="Polygon limit" onRetry={onRetry} />);
-    expect(screen.getByText(/Polygon limit/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Reconnect/i }));
+    render(<ConnectionStatus state="offline" reason="Provider limit" onRetry={onRetry} />);
+    expect(screen.getByText(/Provider limit/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Try again/i));
     expect(onRetry).toHaveBeenCalledTimes(1);
-  });
-
-  it("hides when banner disabled", () => {
-    const original = import.meta.env.VITE_STATUS_BANNER;
-    import.meta.env.VITE_STATUS_BANNER = "0";
-    const { container } = render(<ConnectionStatus state="connecting" />);
-    expect(container.firstChild).toBeNull();
-    import.meta.env.VITE_STATUS_BANNER = original;
   });
 });

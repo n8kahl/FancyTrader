@@ -3,10 +3,10 @@ import { describe, it, expect, vi } from "vitest";
 import { HealthBanner } from "../HealthBanner";
 
 describe("HealthBanner", () => {
-  it("renders Connected when healthy", () => {
+  it("renders Healthy when status healthy", () => {
     render(<HealthBanner status="healthy" phase="regular" />);
     expect(screen.getByRole("status")).toBeInTheDocument();
-    expect(screen.getByText(/Connected/i)).toBeInTheDocument();
+    expect(screen.getByText(/Healthy/i)).toBeInTheDocument();
   });
 
   it("renders Offline with reason and retry", () => {

@@ -22,7 +22,7 @@ export const HealthBanner: React.FC<HealthBannerProps> = ({
 
   const label =
     status === "healthy"
-      ? "Connected"
+      ? "Healthy"
       : status === "degraded"
       ? "Degraded"
       : status === "down"
@@ -32,7 +32,7 @@ export const HealthBanner: React.FC<HealthBannerProps> = ({
   return (
     <div role="status" data-testid="health-banner" className="border rounded-md px-3 py-2 text-sm">
       <div className="flex items-center justify-between">
-        <div className="font-medium">{label}</div>
+        <div className="font-medium" data-testid="status-label">{label}</div>
         {onRetry && (
           <button className="rounded-md border px-2 py-1" onClick={onRetry}>
             Try again

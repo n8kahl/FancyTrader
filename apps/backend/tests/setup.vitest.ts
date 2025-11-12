@@ -23,3 +23,5 @@ process.env.MASSIVE_WS_BASE ??= "wss://socket.massive.test";
 process.env.MASSIVE_WS_CLUSTER ??= "options";
 process.env.SUPABASE_URL ??= "https://example.supabase.co";
 process.env.SUPABASE_ANON_KEY ??= "anon_test_key";
+process.env.METRICS_ENABLED ??= "true";
+process.env.METRICS_TOKEN ??= "test-token";
